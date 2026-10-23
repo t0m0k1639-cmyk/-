@@ -120,3 +120,8 @@ def test_weight_rule():
     assert parse.parse_weight_rule("<div><span>ハンデ</span></div>") == "ハンデ"
     assert parse.parse_weight_rule("<p>定量</p><td>牝4</td>") == "定量"
     assert parse.parse_weight_rule("<p>なし</p>") is None
+
+
+def test_day_rows_bare_fillies_mark():
+    html = DAY_HTML.replace("2歳未勝利（混合）［指定］", "2歳未勝利牝[指定]")
+    assert parse.parse_day_rows(html)[0].fields["fillies_only"]

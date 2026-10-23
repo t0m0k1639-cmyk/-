@@ -37,8 +37,9 @@ def _entry(home_actions: list[parse.Action], label: str, path_suffix: str) -> tu
 
 def _day_actions(html: str, path_suffix: str, today: date) -> list[parse.Action]:
     ymd = today.strftime("%Y%m%d")
+    # 「4回東京8日」のように競馬場名があるものだけ（「今週の出走馬一覧」などを除く）
     return [a for a in parse.extract_actions(html)
-            if a.path.endswith(path_suffix)
+            if a.path.endswith(path_suffix) and parse.parse_venue(a.text)
             and (parse.mentions_date(a.context, today.month, today.day) or ymd in a.cname)]
 
 

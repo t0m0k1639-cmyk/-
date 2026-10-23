@@ -128,7 +128,8 @@ def parse_day_rows(html: str) -> list[DayRow]:
         fields["name"] = name
         cond = parse_conditions(name)
         fields["race_class"] = cond.get("race_class")
-        fields["fillies_only"] = cond.get("fillies_only", False)
+        # 一覧表では牝馬限定が「2歳未勝利牝[指定]」のように括弧なしで書かれる
+        fields["fillies_only"] = "牝" in name
         fields["handicap"] = cond.get("handicap", False)
 
         d = tr.find("td", class_="dist")
