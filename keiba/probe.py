@@ -1,6 +1,6 @@
 """JRAのページ構成を調べるための調査用コマンド。
 
-読み取り結果と、見出し付近の短い HTML だけをログに出す（オッズ表などの中身は出さない）。
+ログは公開されるので、HTML の構造だけを出し、日本語の文字は伏せ字にする。
   python -m keiba.probe --date YYYY-MM-DD
 """
 from __future__ import annotations
@@ -14,9 +14,11 @@ from .__main__ import contact, load_config
 from .fetch import Fetcher
 
 
-def snippet(html: str, word: str, chars: int = 1200) -> str:
-    i = html.find(word)
-    return "（見つからず）" if i < 0 else re.sub(r"\s+", " ", html[max(0, i - chars // 2):i + chars // 2])
+def masked(html: str, limit: int = 3000) -> str:
+    """タグと class は残し、3文字以上の日本語の並びを ◯ に置き換える。"""
+    s = re.sub(r"\s+", " ", html)
+    s = re.sub(r"[぀-ヿ一-鿿・ー]{3,}", lambda m: "◯" * len(m.group(0)), s)
+    return s[:limit]
 
 
 def main() -> None:
@@ -24,37 +26,42 @@ def main() -> None:
     p.add_argument("--date", required=True)
     day = date.fromisoformat(p.parse_args().date)
     cfg = load_config()
-    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 40)
+    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 20)
 
-    race_day, _, _, top = jra.is_race_day(f, day)
-    print("開催日:", race_day)
+    _, _, _, top = jra.is_race_day(f, day)
     days = jra._day_actions(top, "accessD.html", day)
-    print("開催:", [d.text for d in days])
     if not days:
+        print("開催なし")
         return
     page = f.post_cname(days[0].path, days[0].cname)
     rows = parse.parse_day_rows(page)
-    print(f"\n{days[0].text}: {len(rows)} レース")
-    for r in rows:
-        print(" ", r.fields, "| 出馬表:", r.race_link and r.race_link.path[-40:],
-              "| オッズ:", r.odds_link)
-    odds_td = parse.BeautifulSoup(page, "html.parser").select("td.odds")
-    print("\ntd.odds の例:", [re.sub(r"\s+", " ", str(t))[:300] for t in odds_td[:2]])
+    print("td.odds:", [masked(str(t), 400) for t in
+                       parse.BeautifulSoup(page, "html.parser").select("td.odds")[:2]])
+    print("オッズのリンク:", [r.odds_link for r in rows[:2]])
 
-    for r in rows[:2] + [x for x in rows if x.fields.get("race_class") in ("G1", "G2", "G3")][:1]:
-        html = jra._open(f, r.race_link)
-        print(f"\n--- {r.fields['number']}R 出馬表 ---")
-        print("parse_weight_rule:", parse.parse_weight_rule(html))
-        for w in ("定量", "別定", "馬齢", "ハンデ"):
-            if w in html:
-                print(f"「{w}」付近:", snippet(html, w, 500))
-                break
+    html = jra._open(f, rows[0].race_link)
+    soup = parse.BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        if "馬名" not in table.get_text():
+            continue
+        print("\n=== 馬の表 ===")
+        print("table の class:", table.get("class"))
+        trs = table.find_all("tr")
+        print("行数:", len(trs))
+        for tr in trs[:3]:
+            print("\n--- 行 ---")
+            print(masked(str(tr)))
+        break
 
-    if any(r.odds_link for r in rows):
-        r = next(r for r in rows if r.odds_link)
-        print("\nオッズ:", len(jra._odds(f, r.odds_link)), "頭分を読み取り")
-
-    print("\n馬場:", jra.collect_going(f))
+    if rows[0].odds_link:
+        ohtml = jra._open(f, rows[0].odds_link)
+        osoup = parse.BeautifulSoup(ohtml, "html.parser")
+        print("\n=== オッズページ ===")
+        print("parse_win_odds の件数:", len(parse.parse_win_odds(ohtml)))
+        for t in osoup.find_all("table")[:2]:
+            print("table の class:", t.get("class"))
+            for tr in t.find_all("tr")[:3]:
+                print(masked(str(tr), 1500))
     print("\nリクエスト数:", f.count)
 
 
