@@ -48,7 +48,12 @@ def main() -> None:
     for h in horses:
         p = h.past[0] if h.past else {}
         print(" ", h.number, len(h.past), [p.get(k) for k in ("place", "heads", "surface", "distance", "last3f", "margin", "corners")])
+    print("単勝オッズ・人気の読み取り:", [(h.number, h.odds, h.popularity) for h in horses])
     soup = parse.BeautifulSoup(html, "html.parser")
+    first = soup.select_one("td.horse")
+    if first:
+        nl = first.find(class_="name_line")
+        print("馬名欄（オッズの位置確認）:", masked(str(nl or first), 1200))
     shown = 0
     for td in soup.select("td.past"):
         if len(td.get_text(strip=True)) < 10:
