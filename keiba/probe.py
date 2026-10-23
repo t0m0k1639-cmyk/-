@@ -50,31 +50,26 @@ def main() -> None:
     show_actions("開催ページ", acts)
     markup_near_first_action(page)
 
-    # 開催ページで最も多い cname の形をレースのリンクとみなして1つ開く
-    common = Counter(a.cname[:7] for a in acts if a.cname != days[0].cname).most_common(1)
-    if common:
-        race = next(a for a in acts if a.cname.startswith(common[0][0]))
-        html = f.post_cname(race.path, race.cname)
-        text = parse.page_text(html)
-        print("\nレースページの冒頭:", text[:500])
-        print("header_part:", parse.header_part(text)[:500])
-        print("parse_conditions:", parse.parse_conditions(parse.header_part(text)))
-        print("parse_field_size:", parse.parse_field_size(html))
-        print("race_name:", jra._race_name(html))
-        classes = Counter(c for el in parse.BeautifulSoup(html, "html.parser").find_all(class_=True)
-                          for c in el.get("class", []))
-        print("class の多い順:", classes.most_common(40))
+    soup = parse.BeautifulSoup(page, "html.parser")
+    nums = soup.find_all(class_="race_num")
+    print(f"\nrace_num の要素: {len(nums)} 件")
+    for el in nums[:2]:
+        row = el.find_parent("tr") or el.parent.parent
+        print("\n--- レース行のHTML ---")
+        print(re.sub(r"\s+", " ", str(row))[:2500])
+    print("\nJRADB への href:", sorted(set(re.findall(r'href="([^"]*JRADB[^"]*)"', page)))[:20])
 
     otop = f.post_cname(*entry_o)
-    show_actions("オッズトップ", parse.extract_actions(otop), 30)
-    odays = jra._day_actions(otop, "accessO.html", day)
-    if odays:
-        opage = f.post_cname(odays[0].path, odays[0].cname)
-        show_actions("オッズ開催ページ", parse.extract_actions(opage))
+    print("\nオッズトップの本文:", parse.page_text(otop)[1500:2300])
+    i = otop.find("東京")
+    print("\n--- オッズトップの「東京」付近のHTML ---")
+    print(re.sub(r"\s+", " ", otop[max(0, i - 800):i + 800]))
 
     baba = f.get("/keiba/baba/")
     print("\n馬場ページ:", parse.parse_venue(parse.page_text(baba)), parse.parse_going(parse.page_text(baba)))
-    print("馬場ページ内リンク:", sorted(set(re.findall(r'href="(/keiba/baba/[^"]+)"', baba)))[:20])
+    print("馬場ページの href（index を含む）:", sorted(set(re.findall(r'href="([^"]*index[^"]*)"', baba))))
+    i = baba.find("京都")
+    print("馬場ページの「京都」付近:", re.sub(r"\s+", " ", baba[max(0, i - 300):i + 300]))
     print("\nリクエスト数:", f.count)
 
 
