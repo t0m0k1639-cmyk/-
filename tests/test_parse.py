@@ -76,3 +76,47 @@ def test_field_size_from_table():
 def test_going():
     assert parse.parse_going("東京競馬場 馬場状態 芝：良 ダート：稍重") == {"芝": "良", "ダート": "稍重"}
     assert parse.parse_going("芝 不良 ダート 重") == {"芝": "不良", "ダート": "重"}
+
+
+# 開催ページの一覧表の行（2026年10月に確認した構造を最小限に再現）
+DAY_HTML = """
+<table>
+<tr><th class="race_num" scope="col">レース<span>番号</span></th><th class="time">発走時刻</th>
+<th class="race_name">レース名</th><th class="dist"><span>コース</span><span>距離</span><span>頭数</span></th>
+<th class="odds">オッズ</th></tr>
+<tr><th class="race_num" scope="row"><a href="/JRADB/accessD.html?CNAME=pw01dde0105202604080120261024/D9">
+<img alt="1レース" src="x.png"/></a></th>
+<td class="time">10時05分</td>
+<td class="race_name"><div><div> 2歳未勝利（混合）［指定］</div><div></div></div></td>
+<td class="change"></td>
+<td class="dist"><span class="course">ダート</span><span class="dist">1,400<span class="unit">m</span></span>
+<span class="num">14<span class="unit">頭</span></span></td>
+<td class="odds"> 未発表</td></tr>
+<tr><th class="race_num" scope="row"><a href="/JRADB/accessD.html?CNAME=pw01dde0105202604081120261024/2B">
+<img alt="11レース" src="x.png"/></a></th>
+<td class="time">15時45分</td>
+<td class="race_name"><div><div>アルファステークス</div><div>3歳以上オープン（国際）（牝）（特指）</div></div></td>
+<td class="dist"><span class="course">芝</span><span class="dist">1,800<span class="unit">m</span></span>
+<span class="num">18<span class="unit">頭</span></span></td>
+<td class="odds"><a href="#" onclick="doAction('/JRADB/accessO.html','pw151ou1005202604081120261024Z/AA');">オッズ</a></td></tr>
+</table>"""
+
+
+def test_day_rows():
+    rows = parse.parse_day_rows(DAY_HTML)
+    assert [r.fields["number"] for r in rows] == [1, 11]
+    r1, r11 = rows
+    assert r1.fields["post_time"] == "10:05"
+    assert (r1.fields["surface"], r1.fields["distance"], r1.fields["field_size"]) == ("ダート", 1400, 14)
+    assert r1.fields["race_class"] == "未勝利"
+    assert r1.race_link.cname is None and "CNAME=" in r1.race_link.path
+    assert r1.odds_link is None
+    assert r11.fields["race_class"] == "オープン" and r11.fields["fillies_only"]
+    assert r11.fields["surface"] == "芝" and r11.fields["field_size"] == 18
+    assert r11.odds_link.cname.startswith("pw151ou")
+
+
+def test_weight_rule():
+    assert parse.parse_weight_rule("<div><span>ハンデ</span></div>") == "ハンデ"
+    assert parse.parse_weight_rule("<p>定量</p><td>牝4</td>") == "定量"
+    assert parse.parse_weight_rule("<p>なし</p>") is None

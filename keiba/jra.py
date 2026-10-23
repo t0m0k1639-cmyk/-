@@ -1,15 +1,19 @@
 """JRA公式サイトから当日の全レースを集める。
 
-出馬表・オッズは JRADB というページ群で、リンクは doAction('/JRADB/accessX.html', 'cname')
-というフォーム送信になっている。cname は固定のURLを組み立てず、ページ内のリンクをたどって得る。
+JRADB のページ構成（2026年10月に確認）:
+- 出馬表トップ（doAction で cname=pw01dli00/F3 を POST）に、開催ごとのリンクがある。
+  cname に開催日 YYYYMMDD が入っている（例: pw01drl00052026040820261024/BC、文字は「4回東京8日」）
+- 開催ページにはレースの一覧表がある。各行は
+  th.race_num（出馬表へのリンク、img alt「1レース」）/ td.time「10時05分」/ td.race_name /
+  td.dist（span.course・span.dist・span.num）/ td.odds（発売前は「未発表」）
+- 各レースの出馬表は accessD.html?CNAME=... の GET で開ける
 """
 from __future__ import annotations
 
 import logging
 import re
 from datetime import date
-
-from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 from . import parse
 from .fetch import Fetcher
@@ -38,26 +42,6 @@ def _day_actions(html: str, path_suffix: str, today: date) -> list[parse.Action]
             and (parse.mentions_date(a.context, today.month, today.day) or ymd in a.cname)]
 
 
-def _race_actions(html: str, path_suffix: str, visited: set[str]) -> dict[int, parse.Action]:
-    out: dict[int, parse.Action] = {}
-    for a in parse.extract_actions(html):
-        if not a.path.endswith(path_suffix) or a.cname in visited:
-            continue
-        n = parse.parse_race_number(a.text)
-        if n is not None and n not in out:
-            out[n] = a
-    return out
-
-
-def _race_name(html: str) -> str:
-    soup = BeautifulSoup(html, "html.parser")
-    for el in soup.find_all(class_=re.compile("race_name")):
-        t = parse.norm(el.get_text(" "))
-        if t:
-            return t[:40]
-    return ""
-
-
 def is_race_day(f: Fetcher, today: date) -> tuple[bool, tuple[str, str], tuple[str, str], str]:
     home = parse.extract_actions(f.get("/"))
     entry_d = _entry(home, "出馬表", "accessD.html")
@@ -66,60 +50,55 @@ def is_race_day(f: Fetcher, today: date) -> tuple[bool, tuple[str, str], tuple[s
     return bool(_day_actions(top, "accessD.html", today)), entry_d, entry_o, top
 
 
-def collect_races(f: Fetcher, today: date, entry_d, top_d: str) -> list[Race]:
+def _open(f: Fetcher, link: parse.Link) -> str:
+    if link.cname is not None:
+        return f.post_cname(link.path, link.cname)
+    u = urlparse(link.path)
+    return f.get(u.path + (f"?{u.query}" if u.query else ""))
+
+
+def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
     races: list[Race] = []
-    visited: set[str] = {entry_d[1]}
     for day in _day_actions(top_d, "accessD.html", today):
-        visited.add(day.cname)
         page = f.post_cname(day.path, day.cname)
-        day_venue = parse.parse_venue(day.context) or parse.parse_venue(parse.page_text(page))
-        for num, a in sorted(_race_actions(page, "accessD.html", visited).items()):
-            visited.add(a.cname)
-            html = f.post_cname(a.path, a.cname)
-            header = parse.header_part(parse.page_text(html))
-            cond = parse.parse_conditions(header)
-            races.append(Race(
-                venue=parse.parse_venue(header) or day_venue or "不明",
-                number=num,
-                name=_race_name(html),
-                field_size=parse.parse_field_size(html),
-                **cond,
-            ))
+        venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
+        for row in parse.parse_day_rows(page):
+            race = Race(venue=venue, **row.fields)
+            if row.race_link:
+                try:
+                    html = _open(f, row.race_link)
+                    race.handicap = race.handicap or parse.parse_weight_rule(html) == "ハンデ"
+                except Exception as e:  # 1レース分の失敗で全体を止めない
+                    log.warning("%s%dR の出馬表を読めませんでした: %s", venue, race.number, e)
+            if row.odds_link:
+                try:
+                    race.win_odds = _odds(f, row.odds_link)
+                except Exception as e:
+                    log.warning("%s%dR のオッズを読めませんでした: %s", venue, race.number, e)
+            races.append(race)
     return races
 
 
-def collect_odds(f: Fetcher, today: date, entry_o) -> dict[tuple[str, int], list[float]]:
-    out: dict[tuple[str, int], list[float]] = {}
-    visited: set[str] = {entry_o[1]}
-    top = f.post_cname(*entry_o)
-    for day in _day_actions(top, "accessO.html", today):
-        visited.add(day.cname)
-        page = f.post_cname(day.path, day.cname)
-        venue = parse.parse_venue(day.context) or parse.parse_venue(parse.page_text(page))
-        for num, a in sorted(_race_actions(page, "accessO.html", visited).items()):
-            visited.add(a.cname)
-            html = f.post_cname(a.path, a.cname)
-            odds = parse.parse_win_odds(html)
-            if not odds:
-                # 単勝・複勝のタブが別ページのとき
-                tan = next((x for x in parse.extract_actions(html)
-                            if "単勝" in x.text and x.cname not in visited), None)
-                if tan:
-                    visited.add(tan.cname)
-                    odds = parse.parse_win_odds(f.post_cname(tan.path, tan.cname))
-            if odds and venue:
-                out[(venue, num)] = odds
-    return out
+def _odds(f: Fetcher, link: parse.Link) -> list[float]:
+    html = _open(f, link)
+    odds = parse.parse_win_odds(html)
+    if not odds:
+        # 単勝・複勝のタブが別ページのとき
+        tan = next((l for l in parse.extract_links(html) if "単勝" in l.text), None)
+        if tan:
+            odds = parse.parse_win_odds(_open(f, tan))
+    return odds
 
 
 def collect_going(f: Fetcher) -> dict[str, dict[str, str]]:
+    """馬場情報。index.html が1場目、index2.html・index3.html が2場目以降。"""
     first = f.get("/keiba/baba/")
     pages = [first]
-    for href in sorted(set(re.findall(r'href="(/keiba/baba/index\d+\.html)"', first))):
-        pages.append(f.get(href))
+    for name in sorted(set(re.findall(r'href="(?:/keiba/baba/)?(index\d+\.html)"', first))):
+        pages.append(f.get(f"/keiba/baba/{name}"))
     out: dict[str, dict[str, str]] = {}
     for html in pages:
-        text = parse.page_text(html)
+        text = parse.page_text(parse.main_part(html))
         venue = parse.parse_venue(text)
         going = parse.parse_going(text)
         if venue and going:
@@ -127,10 +106,7 @@ def collect_going(f: Fetcher) -> dict[str, dict[str, str]]:
     return out
 
 
-def merge(races: list[Race], odds: dict, going: dict) -> None:
+def merge_going(races: list[Race], going: dict) -> None:
     for r in races:
-        r.win_odds = odds.get((r.venue, r.number), [])
         g = going.get(r.venue, {})
         r.going = g.get("ダート" if r.surface == "ダート" else "芝")
-        if r.field_size is None and r.win_odds:
-            r.field_size = len(r.win_odds)

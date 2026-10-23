@@ -65,6 +65,124 @@ def extract_actions(html: str) -> list[Action]:
     return out
 
 
+@dataclass
+class Link:
+    """doAction（POST, cname あり）か、普通の href（GET, cname なし）のリンク。"""
+    path: str
+    cname: str | None
+    text: str
+
+
+def link_from_tag(tag) -> Link | None:
+    attrs = " ".join(str(tag.get(a, "")) for a in ("onclick", "href"))
+    m = DOACTION_RE.search(attrs)
+    text = norm(tag.get_text(" ") or " ".join(i.get("alt", "") for i in tag.find_all("img")))
+    if m:
+        return Link(m.group(1), m.group(2), text)
+    href = tag.get("href", "")
+    if href.startswith("/JRADB/") and ".html" in href:
+        return Link(href, None, text)
+    return None
+
+
+def extract_links(html: str) -> list[Link]:
+    soup = BeautifulSoup(html, "html.parser")
+    links = (link_from_tag(a) for a in soup.find_all("a"))
+    return [l for l in links if l]
+
+
+@dataclass
+class DayRow:
+    fields: dict            # Race に渡す項目
+    race_link: Link | None  # 出馬表
+    odds_link: Link | None  # オッズ（発売前は None）
+
+
+def _digits(s: str) -> int | None:
+    m = re.search(r"\d[\d,]*", s)
+    return int(m.group(0).replace(",", "")) if m else None
+
+
+def parse_day_rows(html: str) -> list[DayRow]:
+    """開催ページのレース一覧表を1行ずつ読む。"""
+    soup = BeautifulSoup(html, "html.parser")
+    rows = []
+    for th in soup.select("th.race_num"):
+        a = th.find("a")
+        tr = th.find_parent("tr")
+        if a is None or tr is None:
+            continue    # 見出し行
+        img = a.find("img")
+        number = parse_race_number(norm(img.get("alt", "") if img else a.get_text(" ")))
+        if number is None:
+            continue
+        fields: dict = {"number": number}
+
+        t = tr.find("td", class_="time")
+        m = re.search(r"(\d{1,2})\s*[時:]\s*(\d{2})", norm(t.get_text(" "))) if t else None
+        if m:
+            fields["post_time"] = f"{int(m.group(1))}:{m.group(2)}"
+
+        n = tr.find("td", class_="race_name")
+        name = norm(n.get_text(" ")) if n else ""
+        fields["name"] = name
+        cond = parse_conditions(name)
+        fields["race_class"] = cond.get("race_class")
+        fields["fillies_only"] = cond.get("fillies_only", False)
+        fields["handicap"] = cond.get("handicap", False)
+
+        d = tr.find("td", class_="dist")
+        if d:
+            course = d.find("span", class_="course")
+            course = norm(course.get_text(" ")) if course else ""
+            dist = d.find("span", class_="dist")
+            num = d.find("span", class_="num")
+            fields["distance"] = _digits(dist.get_text(" ")) if dist else None
+            fields["field_size"] = _digits(num.get_text(" ")) if num else None
+            if "障害" in name or "障害" in course:
+                fields["surface"] = "障害"
+            elif course.startswith("ダ"):
+                fields["surface"] = "ダート"
+            elif course.startswith("芝"):
+                fields["surface"] = "芝"
+
+        o = tr.find("td", class_="odds")
+        odds_link = None
+        if o:
+            for tag in o.find_all(["a", "button"]):
+                odds_link = link_from_tag(tag)
+                if odds_link:
+                    break
+        rows.append(DayRow(fields, link_from_tag(a), odds_link))
+    return rows
+
+
+WEIGHT_RULES = ("馬齢", "定量", "別定", "ハンデ")
+
+
+def parse_weight_rule(html: str) -> str | None:
+    """出馬表の負担重量の種類（馬齢・定量・別定・ハンデ）。"""
+    soup = BeautifulSoup(html, "html.parser")
+    for s in soup.find_all(string=True):
+        t = norm(str(s))
+        if t in WEIGHT_RULES:
+            return t
+    m = re.search(r"(馬齢|定量|別定|ハンデ)", header_part(page_text(html))[-600:])
+    return m.group(1) if m else None
+
+
+def main_part(html: str) -> str:
+    """ヘッダーのメニュー（全競馬場の名前が並ぶ）を除いた本文。"""
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in ("#contents", "#main", "main", "#contentsBody"):
+        el = soup.select_one(sel)
+        if el:
+            return str(el)
+    for t in soup.find_all(["header", "nav", "footer"]):
+        t.decompose()
+    return str(soup)
+
+
 def date_patterns(month: int, day: int) -> list[str]:
     return [f"{month}月{day}日", f"{month:02d}月{day:02d}日", f"{month}/{day}"]
 

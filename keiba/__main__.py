@@ -114,18 +114,13 @@ def cmd_run(args) -> int:
             log.info("%s は開催日ではありません", day)
             set_output("updated", "false")
             return 0
-        races = jra.collect_races(f, day, entry_d, top_d)
-        try:
-            odds = jra.collect_odds(f, day, entry_o)
-        except FetchError as e:
-            log.warning("オッズの取得に失敗: %s", e)
-            odds = {}
+        races = jra.collect(f, day, top_d)
         try:
             going = jra.collect_going(f)
         except FetchError as e:
             log.warning("馬場情報の取得に失敗: %s", e)
             going = {}
-        jra.merge(races, odds, going)
+        jra.merge_going(races, going)
         warnings = validate(races)
     except (FetchError, ParseError) as e:
         log.error("%s", e)
