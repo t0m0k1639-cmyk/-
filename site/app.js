@@ -9,6 +9,22 @@
     del(k) { try { localStorage.removeItem(k); } catch (_) { /* 無視 */ } },
   };
   state.sort = store.get("sort") || state.sort;
+
+  // ---- 印とメモ（この端末にだけ保存）
+  const MARK_CYCLE = ["", "◎", "○", "▲", "△", "☆", "✕"];
+  let yoso = {};
+  try { yoso = JSON.parse(store.get("yoso") || "{}") || {}; } catch (_) { yoso = {}; }
+  const yosoKey = (r) => `${state.day.date}|${r.key}`;
+  const yosoOf = (r) => yoso[yosoKey(r)] || { m: {}, memo: "" };
+  function saveYoso(r, v) {
+    if (!Object.values(v.m).some(Boolean) && !v.memo) delete yoso[yosoKey(r)];
+    else yoso[yosoKey(r)] = v;
+    store.set("yoso", JSON.stringify(yoso));
+  }
+  function markSummary(r) {
+    const m = yosoOf(r).m;
+    return MARK_CYCLE.slice(1).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${n}`)).join(" ");
+  }
   state.showOdds = store.get("showOdds") !== "0";
 
   async function getJSON(path) {
@@ -82,14 +98,61 @@
     return r.name || [r.race_class, r.surface && `${r.surface}${r.distance || ""}`].filter(Boolean).join(" ");
   }
 
-  function horseRow(h) {
+  const SURF_SHORT = { "芝": "芝", "ダ": "ダ", "障": "障" };
+
+  function pastChip(p) {
+    const place = typeof p.place === "number" ? `${p.place}着` : (p.place || "—");
+    const c = el("span", `pchip${typeof p.place === "number" && p.place <= 3 ? " top" : ""}`);
+    c.append(el("b", "", place), el("small", "", `${(p.venue || "").slice(0, 1)}${SURF_SHORT[p.surface] || ""}${p.distance || ""}`));
+    return c;
+  }
+
+  function pastLine(p) {
+    const md = (p.date || "").replace(/^\d{4}年/, "").replace("月", "/").replace("日", "");
+    const parts = [
+      md, p.venue, p.name,
+      `${p.surface || ""}${p.distance || ""}${p.going ? "・" + p.going : ""}`,
+      p.heads ? `${p.heads}頭${p.gate ? p.gate + "番" : ""}` : null,
+      typeof p.place === "number" ? `${p.place}着${p.margin != null ? `（${p.margin.toFixed(1)}）` : ""}` : p.place,
+      p.corners && p.corners.length ? `通過 ${p.corners.join("-")}` : null,
+      p.last3f ? `上がり ${p.last3f.toFixed(1)}` : null,
+      p.time, p.jockey, p.weight ? `${p.weight.toFixed(1)}kg` : null,
+    ];
+    return el("li", "", parts.filter(Boolean).join("　"));
+  }
+
+  function horseRow(h, r, onMark) {
     const tr = el("tr", h.scratched ? "scratched" : "");
+    const mk = el("td", "h-mark");
+    const btn = Object.assign(el("button", "mark-btn"), { type: "button" });
+    const cur = yosoOf(r).m[h.number] || "";
+    btn.textContent = cur || "・";
+    btn.dataset.mark = cur;
+    btn.setAttribute("aria-label", `${h.number}番の印`);
+    btn.disabled = h.scratched;
+    btn.addEventListener("click", () => {
+      const v = yosoOf(r);
+      const next = MARK_CYCLE[(MARK_CYCLE.indexOf(v.m[h.number] || "") + 1) % MARK_CYCLE.length];
+      // ◎○▲ は1頭だけ。ほかの馬に付いていたら外す
+      if (["◎", "○", "▲"].includes(next)) Object.keys(v.m).forEach((n) => { if (v.m[n] === next) v.m[n] = ""; });
+      v.m[h.number] = next;
+      saveYoso(r, v);
+      onMark();
+    });
+    mk.append(btn);
     const num = el("td", "h-num");
     num.append(el("span", `waku waku-${h.waku || 0}`, h.number));
     const main = el("td", "h-main");
-    main.append(el("span", "h-name", h.name));
+    const nameBtn = Object.assign(el("button", "h-name"), { type: "button", textContent: h.name });
+    main.append(nameBtn);
     const sub = [h.sex_age, h.weight != null ? `${h.weight.toFixed(1)}kg` : null, h.jockey].filter(Boolean).join("・");
     main.append(el("span", "h-sub", h.scratched ? `取消・${sub}` : sub));
+    const past = h.past || [];
+    if (past.length) {
+      const chips = el("span", "h-past");
+      chips.append(...past.map(pastChip));
+      main.append(chips);
+    }
     const odds = el("td", "col-odds h-odds");
     if (h.odds != null) {
       odds.append(el("span", "h-win", h.odds.toFixed(1)));
@@ -97,8 +160,72 @@
     } else {
       odds.append(el("span", "h-none", h.scratched ? "—" : "未発表"));
     }
-    tr.append(num, main, odds);
-    return tr;
+    tr.append(mk, num, main, odds);
+
+    const detail = el("tr", "past-detail");
+    detail.hidden = true;
+    const td = el("td");
+    td.colSpan = 4;
+    const ul = el("ul", "past-list");
+    if (past.length) ul.append(...past.map(pastLine));
+    else ul.append(el("li", "", "前走のデータはありません（新馬など）"));
+    td.append(ul);
+    detail.append(td);
+    nameBtn.setAttribute("aria-expanded", "false");
+    nameBtn.addEventListener("click", () => {
+      detail.hidden = !detail.hidden;
+      nameBtn.setAttribute("aria-expanded", String(!detail.hidden));
+    });
+    return [tr, detail];
+  }
+
+  function pct(x) { return (x * 100).toFixed(1) + "%"; }
+
+  function renderSim(r, out) {
+    out.replaceChildren(el("p", "sim-run", "計算しています…"));
+    setTimeout(() => {
+      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r));
+      if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
+      const head = el("p", "sim-head",
+        `${res.course}・馬場${res.going}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
+      const wrap = el("div", "sim-wrap");
+      const table = el("table", "sim-table");
+      const thead = el("thead");
+      const htr = el("tr");
+      ["予想", "馬番", "馬名・脚質", "勝率", "連対", "複勝"].forEach((t) => htr.append(Object.assign(el("th", t === "連対" ? "s-top2" : "", t), { scope: "col" })));
+      thead.append(htr);
+      const tbody = el("tbody");
+      const maxW = Math.max(...res.rows.map((x) => x.win)) || 1;
+      res.rows.forEach((x) => {
+        const tr = el("tr");
+        const nm = el("td", "s-name");
+        const sub = el("span", "h-sub", [window.RaceSim.STYLE_NAMES[x.h.style], ...x.h.notes].join("・"));
+        sub.title = sub.textContent;
+        nm.append(el("span", "h-name-plain", x.h.name), sub);
+        const w = el("td", "s-num");
+        const bar = el("span", "s-bar");
+        bar.append(Object.assign(el("i"), { style: `width:${(x.win / maxW * 100).toFixed(0)}%` }));
+        w.append(bar, document.createTextNode(pct(x.win)));
+        const num = el("td");
+        num.append(el("span", `waku waku-${x.h.waku || 0}`, x.h.num));
+        tr.append(el("td", "s-mark", x.mark), num, nm, w, el("td", "s-num s-top2", pct(x.top2)), el("td", "s-num", pct(x.top3)));
+        tbody.append(tr);
+      });
+      table.append(thead, tbody);
+      wrap.append(table);
+      const use = Object.assign(el("button", "sim-use"), { type: "button", textContent: "この予想印を自分の印にする" });
+      use.addEventListener("click", () => {
+        const v = yosoOf(r);
+        v.m = {};
+        res.rows.forEach((x) => { if (x.mark) v.m[x.h.num] = x.mark; });
+        saveYoso(r, v);
+        renderList();
+        const card = document.getElementById(`r-${r.key}`);
+        if (card) { card.querySelector(".race-head").click(); card.scrollIntoView({ block: "start" }); }
+      });
+      const note = el("p", "sim-note", "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズと人気は使っていません。勝率は実際の結果で検証した数字ではないので、馬同士の順番と差の目安として見てください。");
+      out.replaceChildren(head, wrap, use, note);
+    }, 30);
   }
 
   function renderRace(r) {
@@ -111,15 +238,24 @@
     if (r.label) { pill.textContent = r.label; pill.classList.add(pillClass(r.label)); }
     node.querySelector(".race-tags").replaceChildren(...tags(r));
     const horses = r.horses || [];
-    node.querySelector(".more").textContent = horses.length ? `出走馬を見る（${horses.length}頭）` : "詳しく見る";
+    const marks = markSummary(r);
+    node.querySelector(".more").textContent = marks ? `印 ${marks}` : (horses.length ? `出走馬を見る（${horses.length}頭）` : "詳しく見る");
     node.querySelector(".score-target .score-val").textContent = r.target;
     node.querySelector(".score-chaos .score-val").textContent = r.chaos;
     node.querySelector(".score-target .meter i").style.width = `${r.target}%`;
     node.querySelector(".score-chaos .meter i").style.width = `${r.chaos}%`;
 
     const wrap = node.querySelector(".horses-wrap");
+    const tbody = node.querySelector(".horses tbody");
+    const fillHorses = () => {
+      tbody.replaceChildren(...[...horses].sort((a, b) => a.number - b.number).flatMap((h) => horseRow(h, r, () => {
+        fillHorses();
+        const m = markSummary(r);
+        node.querySelector(".more").textContent = m ? `印 ${m}` : `出走馬を見る（${horses.length}頭）`;
+      })));
+    };
     if (horses.length) {
-      node.querySelector(".horses tbody").replaceChildren(...[...horses].sort((a, b) => a.number - b.number).map(horseRow));
+      fillHorses();
     } else {
       wrap.replaceChildren(el("p", "h-empty", "出走馬はまだ読み取れていません"));
     }
@@ -129,6 +265,15 @@
     node.querySelector(".split").textContent = `荒れ度の内訳: 条件 ${r.condition_chaos} / オッズ ${mkt}　ズレ ${gap}`;
     const reasons = r.reasons.length ? r.reasons : ["目立つ要素はありません"];
     node.querySelector(".reasons").replaceChildren(...reasons.map((t) => el("li", "", t)));
+
+    const simBtn = node.querySelector(".sim-btn");
+    if (!horses.length || r.surface === "障害") simBtn.disabled = true;
+    simBtn.addEventListener("click", () => renderSim(r, node.querySelector(".sim-out")));
+
+    const memo = node.querySelector(".memo textarea");
+    memo.id = `memo-${r.key}`;
+    memo.value = yosoOf(r).memo || "";
+    memo.addEventListener("input", () => { const v = yosoOf(r); v.memo = memo.value; saveYoso(r, v); });
 
     const head = node.querySelector(".race-head");
     const detail = node.querySelector(".race-detail");

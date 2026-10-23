@@ -267,3 +267,77 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 .waku-6 { background: #1d9a48; color: #ffffff; border-color: #1d9a48; }
 .waku-7 { background: #f08c1c; color: #1c2320; border-color: #f08c1c; }
 .waku-8 { background: #f4a0c0; color: #1c2320; border-color: #e889ad; }
+
+/* 印 */
+.d-hint { margin: 0 0 8px; font-size: 0.6875rem; color: var(--muted); }
+.h-mark { width: 2.4rem; }
+.mark-btn {
+  font: inherit; font-size: 1.125rem; font-weight: 900; width: 2.2rem; height: 2.2rem; border-radius: 8px;
+  border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; line-height: 1;
+}
+.mark-btn:not([data-mark=""]) { border-style: solid; border-color: var(--ana); color: var(--ana); background: var(--ana-soft); }
+.mark-btn[data-mark="✕"] { border-color: var(--line); color: var(--muted); background: var(--bg); }
+.mark-btn:disabled { opacity: 0.3; cursor: default; }
+.horses th:first-child, .horses td:first-child { padding-left: 12px; padding-right: 0; }
+
+/* 馬名と近走 */
+.h-name {
+  display: block; font: inherit; font-weight: 700; font-size: var(--step-0); text-align: left;
+  background: none; border: 0; padding: 0; color: var(--fg); cursor: pointer; overflow-wrap: anywhere;
+}
+.h-name[aria-expanded="true"] { color: var(--accent); }
+.h-past { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.pchip {
+  display: inline-grid; justify-items: center; min-width: 2.6rem; padding: 1px 4px; border-radius: 4px;
+  border: 1px solid var(--line); line-height: 1.2; font-variant-numeric: tabular-nums;
+}
+.pchip b { font-size: 0.75rem; }
+.pchip small { font-size: 0.625rem; color: var(--muted); }
+.pchip.top { border-color: var(--accent); background: var(--accent-soft); }
+.pchip.top b { color: var(--accent); }
+.past-detail td { background: var(--bg); padding: 6px 12px 8px; }
+.past-list { margin: 0; padding-left: 1.1em; font-size: 0.75rem; display: grid; gap: 4px; }
+
+/* シミュレーション */
+.sim { margin: 4px 0 12px; display: grid; gap: 8px; }
+.sim-btn, .sim-use {
+  font: inherit; font-weight: 700; border-radius: 999px; padding: 9px 12px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface);
+}
+.sim-use { background: transparent; color: var(--accent); justify-self: start; font-size: var(--step--1); padding: 6px 12px; }
+.sim-btn:disabled { opacity: 0.4; cursor: default; }
+.sim-head { margin: 0; font-size: var(--step--1); color: var(--muted); }
+.sim-run, .sim-err { margin: 0; font-size: var(--step--1); color: var(--muted); }
+.sim-err { color: var(--err-fg); }
+.sim-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.sim-table { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.sim-table th { font-size: 0.6875rem; color: var(--muted); font-weight: 700; text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.sim-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.sim-table tr:last-child td { border-bottom: 0; }
+.s-mark { font-weight: 900; font-size: var(--step-1); color: var(--ana); text-align: center; width: 1.8rem; }
+.s-name { min-width: 8rem; }
+.h-name-plain { display: block; font-weight: 700; }
+.s-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.s-bar { display: inline-block; width: 2.6rem; height: 6px; border-radius: 3px; background: var(--line); margin-right: 4px; vertical-align: middle; overflow: hidden; }
+.s-bar i { display: block; height: 100%; background: var(--accent); }
+.sim-note { margin: 0; font-size: 0.6875rem; color: var(--muted); }
+
+/* メモ */
+.memo { display: grid; gap: 4px; margin-bottom: 10px; font-size: var(--step--1); color: var(--muted); font-weight: 700; }
+.memo textarea {
+  font: inherit; font-weight: 400; font-size: var(--step-0); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; width: 100%;
+}
+
+/* 中の表が広くても、ページ全体は画面幅に収める（表はそれぞれの枠の中で横スクロール） */
+main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
+.race, .race-detail { min-width: 0; }
+.sim { grid-template-columns: minmax(0, 1fr); }
+.s-name { min-width: 0; max-width: 9.5rem; }
+.s-name .h-name-plain, .s-name .h-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.s-name .h-sub { font-size: 0.6875rem; }
+.s-bar { width: 1.8rem; }
+.sim-table td, .sim-table th { padding-left: 4px; padding-right: 4px; }
+@media (max-width: 440px) { .s-top2 { display: none; } }
+.s-name { max-width: 8.5rem; } .s-mark { width: 1.4rem; }
+.past-detail td { white-space: normal; } .past-list li { overflow-wrap: anywhere; }

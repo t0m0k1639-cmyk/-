@@ -96,18 +96,25 @@
       </span>
     </button>
     <div class="race-detail" hidden>
+      <p class="d-hint">左の印をタップすると ◎○▲△☆✕ の順に変わります。馬名をタップすると前走〜4走前が開きます。</p>
       <div class="horses-wrap">
         <table class="horses">
-          <thead><tr><th scope="col">馬番</th><th scope="col">馬名・性齢・斤量・騎手</th><th scope="col" class="col-odds">単勝</th></tr></thead>
+          <thead><tr><th scope="col">印</th><th scope="col">馬番</th><th scope="col">馬名・性齢・斤量・騎手／近走</th><th scope="col" class="col-odds">単勝</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
+      <div class="sim">
+        <button type="button" class="sim-btn">シミュレーション（5000回）</button>
+        <div class="sim-out" aria-live="polite"></div>
+      </div>
+      <label class="memo"><span>メモ</span><textarea rows="3" placeholder="このレースのメモ（この端末に保存されます）"></textarea></label>
       <p class="split"></p>
       <ul class="reasons"></ul>
     </div>
   </li>
 </template>
 
+<script src="sim.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

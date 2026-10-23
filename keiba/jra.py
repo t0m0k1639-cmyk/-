@@ -70,6 +70,7 @@ def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
                     html = _open(f, row.race_link)
                     race.handicap = race.handicap or parse.parse_weight_rule(html) == "ハンデ"
                     race.horses = parse.parse_horses(html)
+                    race.course_detail = parse.parse_course_detail(html)
                 except Exception as e:  # 1レース分の失敗で全体を止めない
                     log.warning("%s%dR の出馬表を読めませんでした: %s", venue, race.number, e)
             running = [h for h in race.horses if not h.scratched]

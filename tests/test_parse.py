@@ -161,3 +161,43 @@ def test_parse_horses():
     assert (b.sex_age, b.weight, b.jockey) == ("牡4", 57.0, "騎手 次郎")
     assert c.scratched and not a.scratched
     assert parse.parse_weight_rule(RACE_HTML) == "定量"
+
+
+# 前走欄（2026年10月に確認した構造。名前などは架空）
+PAST_TD = """<table><tr><td class="num">1</td><td class="horse"><div class="name">テストデルタ</div></td>
+<td class="jockey"><p>牝3/鹿毛</p><p>55.0kg</p><p class="jockey">騎手 三郎</p></td>
+<td class="past p1"><div class="date_line"><div class="date">2026年10月10日</div><div class="rc">東京</div></div>
+<div class="race_line"><div class="name"><a href="#">3歳以上1勝クラス</a></div><div class="r_class"></div></div>
+<div class="place_line"><div class="place">14<span>着</span></div><div class="num"><span class="max">16<span>頭</span></span>
+<span class="gate">8<span>番</span></span><span class="pop">14<span>番人気</span></span></div></div>
+<div class="info_line1"><div class="jockey">騎手 四郎</div><div class="weight">54.0<span>kg</span></div></div>
+<div class="info_line2"><div class="line"><div class="col left"><span class="dist">1800ダ</span></div>
+<div class="col right"><p class="time">1:54.7</p></div></div><div class="line"><div class="col left"><span class="condition">良</span></div>
+<div class="col right"><p class="h_weight">442<span>kg</span></p></div></div></div>
+<div class="info_line3"><div class="line"><div class="corner_list"><ul><li title="1コーナー">4</li><li>5</li><li>5</li><li>5</li></ul></div>
+<div class="f3">3F 39.2</div></div><p class="fin">テストウィナー<span class="time">(2.5)</span></p></div></td>
+<td class="past p2"><div class="date_line"><div class="date">2026年5月17日</div><div class="rc">新潟</div></div>
+<div class="race_line"><div class="name">精進湖特別</div><div class="r_class">2勝クラス</div></div>
+<div class="place_line"><div class="place">1<span>着</span></div><div class="num"><span class="max">13<span>頭</span></span></div></div>
+<div class="info_line2"><span class="dist">1600芝</span><p class="time">1:33.9</p><span class="condition">稍重</span></div>
+<div class="info_line3"><div class="corner_list"><ul><li>3</li><li>3</li></ul></div><div class="f3">3F 34.0</div>
+<p class="fin">テストセカンド<span class="time">(0.1)</span></p></div></td>
+<td class="past p3"></td></tr></table>"""
+
+
+def test_parse_past():
+    [h] = parse.parse_horses(PAST_TD.replace("<table>", "<table><tr><th>馬名</th></tr>"))
+    p1, p2 = h.past
+    assert p1["date"] == "2026年10月10日" and p1["venue"] == "東京"
+    assert (p1["place"], p1["heads"], p1["gate"]) == (14, 16, 8)
+    assert (p1["surface"], p1["distance"], p1["going"]) == ("ダ", 1800, "良")
+    assert (p1["time"], p1["last3f"], p1["margin"]) == ("1:54.7", 39.2, 2.5)
+    assert p1["corners"] == [4, 5, 5, 5] and p1["jockey"] == "騎手 四郎" and p1["weight"] == 54.0
+    assert "1勝クラス" in p1["name"]
+    assert p2["race_class"] == "2勝クラス" and p2["place"] == 1 and p2["margin"] == 0.0
+    assert (p2["surface"], p2["distance"], p2["going"]) == ("芝", 1600, "稍重")
+
+
+def test_course_detail():
+    html = '<div class="cell course"><span class="cap">コース：</span>1,800<span class="detail">（芝・右・外）</span></div>'
+    assert parse.parse_course_detail(html) == "芝・右・外"

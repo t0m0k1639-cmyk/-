@@ -166,6 +166,57 @@ def _text(el) -> str:
     return norm(el.get_text(" ")) if el else ""
 
 
+def parse_past(td) -> dict | None:
+    """出馬表の前走欄1つ（td.past）を読む。
+
+    構造（2026年10月に確認）: div.date「2026年10月10日」/ div.rc（競馬場）/ div.name（レース名）/
+    div.r_class / div.place「14着」/ span.max「16頭」/ span.gate「8番」/ div.jockey / div.weight「54.0kg」/
+    span.dist「1800ダ」/ p.time「1:54.7」/ span.condition「良」/ p.h_weight「442kg」/
+    div.corner_list li（各コーナーの通過順）/ div.f3「3F 39.2」/ p.fin span.time「(2.5)」（着差）
+    """
+    date = _text(td.find(class_="date"))
+    if not re.search(r"\d{4}年\d{1,2}月\d{1,2}日", date):
+        return None
+    out: dict = {"date": date}
+    out["venue"] = _text(td.find(class_="rc")) or None
+    out["name"] = _text(td.find("div", class_="name")) or None
+    rc = td.find(class_="r_class")
+    out["race_class"] = (_text(rc) + " " + " ".join(i.get("alt", "") for i in rc.find_all("img"))).strip() if rc else ""
+
+    place = _text(td.find(class_="place"))
+    out["place"] = _digits(place) if re.match(r"\d", place) else (place.replace("着", "") or None)
+    num = td.find(class_="num")
+    out["heads"] = _digits(_text(num.find(class_="max"))) if num else None
+    out["gate"] = _digits(_text(num.find(class_="gate"))) if num else None
+
+    line1 = td.find(class_="info_line1")
+    out["jockey"] = _text(line1.find(class_="jockey")) or None if line1 else None
+    m = re.search(r"\d{2}\.\d", _text(line1.find(class_="weight"))) if line1 else None
+    out["weight"] = float(m.group(0)) if m else None
+
+    m = re.search(r"(\d{3,4})\s*(芝|ダ|障)", _text(td.find(class_="dist")))
+    out["distance"], out["surface"] = (int(m.group(1)), m.group(2)) if m else (None, None)
+    line2 = td.find(class_="info_line2")
+    out["time"] = _text(line2.find("p", class_="time")) or None if line2 else None
+    out["going"] = _text(td.find(class_="condition")) or None
+    out["body_weight"] = _digits(_text(td.find(class_="h_weight")))
+
+    out["corners"] = [int(t) for t in (_text(li) for li in td.select(".corner_list li")) if t.isdigit()]
+    m = re.search(r"(\d{2}\.\d)", _text(td.find(class_="f3")))
+    out["last3f"] = float(m.group(1)) if m else None
+    fin = td.find(class_="fin")
+    m = re.search(r"\(\s*(-?\d+(?:\.\d)?)\s*\)", _text(fin.find(class_="time"))) if fin else None
+    out["margin"] = 0.0 if out["place"] == 1 else (abs(float(m.group(1))) if m else None)
+    return out
+
+
+def parse_course_detail(html: str) -> str | None:
+    """出馬表のコース表記（例: 「（芝・右・外）」→「芝・右・外」）。"""
+    soup = BeautifulSoup(html, "html.parser")
+    el = soup.select_one(".cell.course .detail")
+    return norm(el.get_text(" ")).strip("() ") if el else None
+
+
 def parse_horses(html: str):
     """出馬表の馬の表（table.basic で「馬名」を含むもの）を読む。
 
@@ -222,10 +273,11 @@ def parse_horses(html: str):
 
         trainer = _text(horse_td.find(class_="trainer")).split("(")[0].strip() or None
         row_text = _text(tr.find("td", class_="num")) + _text(horse_td.find(class_="name_line")) + jtext
+        past = [p for p in (parse_past(td) for td in tr.select("td.past")) if p]
         horses.append(Horse(
             number=number, name=name, waku=waku, sex_age=sex_age, weight=weight,
             jockey=jockey, trainer=trainer, odds=odds, popularity=pop,
-            scratched=bool(SCRATCH_RE.search(row_text)),
+            scratched=bool(SCRATCH_RE.search(row_text)), past=past,
         ))
     return horses
 

@@ -42,6 +42,12 @@ def main() -> None:
     # 前走欄の構造（3歳以上の条件戦の方が過去走が多い）
     target = next((r for r in rows if r.fields.get("race_class") in ("1勝クラス", "2勝クラス")), rows[0])
     html = jra._open(f, target.race_link)
+    horses = parse.parse_horses(html)
+    print("\nコース表記:", parse.parse_course_detail(html))
+    print("前走の読み取り（馬番, 走数, 前走の着順・頭数・芝ダ・距離・上がり・着差・通過）:")
+    for h in horses:
+        p = h.past[0] if h.past else {}
+        print(" ", h.number, len(h.past), [p.get(k) for k in ("place", "heads", "surface", "distance", "last3f", "margin", "corners")])
     soup = parse.BeautifulSoup(html, "html.parser")
     shown = 0
     for td in soup.select("td.past"):

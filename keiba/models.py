@@ -15,6 +15,7 @@ class Horse:
     odds: float | None = None       # 単勝オッズ
     popularity: int | None = None   # 人気
     scratched: bool = False         # 取消・除外
+    past: list[dict] = field(default_factory=list)  # 前走から新しい順に最大4走
 
 
 @dataclass
@@ -30,6 +31,7 @@ class Race:
     field_size: int | None = None   # 頭数（取消を除く）
     going: str | None = None        # 馬場状態
     post_time: str | None = None    # 発走時刻 "15:40"
+    course_detail: str | None = None  # 出馬表のコース表記（例: 芝・右・外）
     horses: list[Horse] = field(default_factory=list)
     # 単勝オッズ。スコア計算に使う（各馬の odds があればそこから作る）
     win_odds: list[float] = field(default_factory=list, repr=False)
