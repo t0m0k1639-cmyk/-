@@ -44,12 +44,17 @@
     const key = await crypto.subtle.deriveKey(
       { name: "PBKDF2", hash: "SHA-256", salt: fromB64(env.salt), iterations: env.iter },
       base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    let plain;
     try {
-      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(env.iv) }, key, fromB64(env.ct));
-      return JSON.parse(new TextDecoder().decode(plain));
+      plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(env.iv) }, key, fromB64(env.ct));
     } catch (_) {
       throw new WrongPassword("パスワードが違います");
     }
+    if (env.z === "gzip") {
+      const stream = new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"));
+      return JSON.parse(await new Response(stream).text());
+    }
+    return JSON.parse(new TextDecoder().decode(plain));
   }
 
   // ---- 表示の部品 ----
