@@ -42,6 +42,7 @@ jobs:
         continue-on-error: true
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
         run: python -m keiba run ${TARGET_DATE:+--date "$TARGET_DATE"}
 

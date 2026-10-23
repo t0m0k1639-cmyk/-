@@ -16,7 +16,7 @@ from datetime import date
 from urllib.parse import urlparse
 
 from . import parse
-from .fetch import BASE, Fetcher
+from .fetch import Fetcher
 from .models import Race
 
 log = logging.getLogger(__name__)
@@ -65,15 +65,19 @@ def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
         venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
         for row in parse.parse_day_rows(page):
             race = Race(venue=venue, **row.fields)
-            if row.race_link and row.race_link.cname is None:
-                race.jra_url = BASE + row.race_link.path
             if row.race_link:
                 try:
                     html = _open(f, row.race_link)
                     race.handicap = race.handicap or parse.parse_weight_rule(html) == "ハンデ"
+                    race.horses = parse.parse_horses(html)
                 except Exception as e:  # 1レース分の失敗で全体を止めない
                     log.warning("%s%dR の出馬表を読めませんでした: %s", venue, race.number, e)
-            if row.odds_link:
+            running = [h for h in race.horses if not h.scratched]
+            if running:
+                race.field_size = len(running)
+            # 当日は出馬表に単勝オッズが載る。載っていなければオッズのページを読む
+            race.win_odds = [h.odds for h in running if h.odds]
+            if not race.win_odds and row.odds_link:
                 try:
                     race.win_odds = _odds(f, row.odds_link)
                 except Exception as e:

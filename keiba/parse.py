@@ -158,6 +158,78 @@ def parse_day_rows(html: str) -> list[DayRow]:
     return rows
 
 
+ODDS_POP_RE = re.compile(r"(?<![\d.])(\d{1,4}(?:,\d{3})*\.\d)(?![\d.])\s*[(（]\s*(\d{1,2})\s*番?人気")
+ODDS_RE = re.compile(r"(?<![\d.])(\d{1,4}(?:,\d{3})*\.\d)(?![\d.])")
+
+
+def _text(el) -> str:
+    return norm(el.get_text(" ")) if el else ""
+
+
+def parse_horses(html: str):
+    """出馬表の馬の表（table.basic で「馬名」を含むもの）を読む。
+
+    行の構造（2026年10月に確認）: td.waku（img alt「枠1白」）/ td.num（馬番）/
+    td.horse（div.name に馬名、p.trainer に調教師、当日は単勝オッズと人気）/
+    td.jockey（性齢・斤量・騎手）/ td.past（前走など）
+    """
+    from .models import Horse
+
+    soup = BeautifulSoup(html, "html.parser")
+    table = next((t for t in soup.find_all("table") if "馬名" in t.get_text()), None)
+    if table is None:
+        return []
+    horses = []
+    for tr in table.find_all("tr"):
+        num_td = tr.find("td", class_="num")
+        horse_td = tr.find("td", class_="horse")
+        if not num_td or not horse_td:
+            continue
+        number = _digits(_text(num_td))
+        if number is None:
+            continue
+        name = _text(horse_td.find(class_="name")) or _text(horse_td.find("a"))
+
+        waku = None
+        w = tr.find("td", class_="waku")
+        if w:
+            img = w.find("img")
+            waku = _digits(img.get("alt", "") if img else _text(w))
+
+        odds = pop = None
+        # 前走欄などの数字を拾わないよう、オッズは馬名の欄からだけ探す
+        htext = _text(horse_td.find(class_="name_line")) + " " + _text(horse_td.find(class_=re.compile("odds")))
+        m = ODDS_POP_RE.search(htext)
+        if m:
+            odds, pop = float(m.group(1).replace(",", "")), int(m.group(2))
+        else:
+            m = ODDS_RE.search(_text(horse_td.find(class_=re.compile("odds"))))
+            if m:
+                odds = float(m.group(1).replace(",", ""))
+
+        jt = tr.find("td", class_="jockey")
+        jtext = _text(jt)
+        sex_age = weight = jockey = None
+        m = re.search(r"([牡牝セ騸])\s*(\d{1,2})", jtext)
+        if m:
+            sex_age = m.group(1) + m.group(2)
+        m = re.search(r"(\d{2}\.\d)\s*(?:kg|キロ)?", jtext)
+        if m:
+            weight = float(m.group(1))
+        if jt:
+            j = jt.find(class_="jockey") or (jt.find_all("a")[-1] if jt.find_all("a") else None)
+            jockey = _text(j) or None
+
+        trainer = _text(horse_td.find(class_="trainer")).split("(")[0].strip() or None
+        row_text = _text(tr.find("td", class_="num")) + _text(horse_td.find(class_="name_line")) + jtext
+        horses.append(Horse(
+            number=number, name=name, waku=waku, sex_age=sex_age, weight=weight,
+            jockey=jockey, trainer=trainer, odds=odds, popularity=pop,
+            scratched=bool(SCRATCH_RE.search(row_text)),
+        ))
+    return horses
+
+
 WEIGHT_RULES = ("馬齢", "定量", "別定", "ハンデ")
 
 

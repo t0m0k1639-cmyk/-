@@ -27,18 +27,32 @@
 <main class="wrap">
   <div id="notice" class="notice" hidden></div>
 
+  <form id="lock" class="lock" hidden>
+    <h2>パスワードを入力</h2>
+    <p>このページは自分専用です。GitHub に設定したパスワードを入れてください。</p>
+    <label class="sr" for="password">パスワード</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <label class="remember"><input id="remember" type="checkbox" checked> この端末で覚える</label>
+    <button type="submit" id="unlock">開く</button>
+    <p id="lock-error" class="lock-error" role="alert" hidden></p>
+  </form>
+
   <section id="top" class="top" aria-label="今日の狙い目" hidden>
     <h2 class="eyebrow">今日の狙い目 上位3レース</h2>
     <ol id="top-list" class="top-list"></ol>
   </section>
 
+  <div id="content" hidden>
   <div class="controls">
     <div class="seg" role="tablist" aria-label="並べ替え">
       <button type="button" id="sort-target" data-sort="target" role="tab">狙い目順</button>
       <button type="button" id="sort-chaos" data-sort="chaos" role="tab">荒れ度順</button>
       <button type="button" id="sort-number" data-sort="number" role="tab">レース順</button>
     </div>
-    <div id="venues" class="chips" aria-label="競馬場"></div>
+    <div class="chips-row">
+      <div id="venues" class="chips" aria-label="競馬場"></div>
+      <button type="button" id="odds-toggle" class="toggle" aria-pressed="true">オッズ表示</button>
+    </div>
   </div>
 
   <ul id="races" class="races"></ul>
@@ -55,14 +69,15 @@
       <dt><span class="pill pill-hon">本命妙味</span></dt>
       <dd>条件は堅めなのに、オッズが割れているレース。</dd>
     </dl>
-    <p>オッズはレースを選ぶための計算にだけ使い、各馬の印の判断には使っていません。このページにはオッズ自体は載せていません。</p>
+    <p>スコアの計算では、オッズはレースを選ぶためだけに使っています。印を考えるときにオッズを見たくなければ「オッズ表示」を押して隠せます。</p>
   </details>
+  </div>
 </main>
 
 <footer class="foot">
   <div class="wrap">
     <p>レース条件・馬場・オッズの出典: JRA公式サイト（日本中央競馬会）。スコアは独自の計算です。</p>
-    <p>出馬表とオッズは <a href="https://www.jra.go.jp/keiba/" target="_blank" rel="noopener">JRA公式サイト</a> で確認してください。</p>
+    <p>このページは私的に見るためのもので、データはパスワードで暗号化しています。</p>
   </div>
 </footer>
 
@@ -73,14 +88,20 @@
       <span class="race-body">
         <span class="race-title"><span class="race-name"></span><span class="pill"></span></span>
         <span class="race-tags"></span>
+        <span class="more"></span>
       </span>
       <span class="scores">
         <span class="score score-target"><span class="score-label">狙い目</span><span class="score-val"></span><span class="meter"><i></i></span></span>
         <span class="score score-chaos"><span class="score-label">荒れ度</span><span class="score-val"></span><span class="meter"><i></i></span></span>
       </span>
     </button>
-    <a class="jra-link" target="_blank" rel="noopener" hidden>出走馬・オッズを JRA で見る <span aria-hidden="true">↗</span></a>
     <div class="race-detail" hidden>
+      <div class="horses-wrap">
+        <table class="horses">
+          <thead><tr><th scope="col">馬番</th><th scope="col">馬名・性齢・斤量・騎手</th><th scope="col" class="col-odds">単勝</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <p class="split"></p>
       <ul class="reasons"></ul>
     </div>

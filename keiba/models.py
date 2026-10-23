@@ -4,6 +4,20 @@ from dataclasses import asdict, dataclass, field
 
 
 @dataclass
+class Horse:
+    number: int                     # 馬番
+    name: str
+    waku: int | None = None         # 枠番
+    sex_age: str | None = None      # 性齢（例: 牝3）
+    weight: float | None = None     # 斤量
+    jockey: str | None = None
+    trainer: str | None = None
+    odds: float | None = None       # 単勝オッズ
+    popularity: int | None = None   # 人気
+    scratched: bool = False         # 取消・除外
+
+
+@dataclass
 class Race:
     venue: str                      # 競馬場（例: 東京）
     number: int                     # レース番号
@@ -16,13 +30,19 @@ class Race:
     field_size: int | None = None   # 頭数（取消を除く）
     going: str | None = None        # 馬場状態
     post_time: str | None = None    # 発走時刻 "15:40"
-    jra_url: str | None = None      # JRA公式の出馬表ページ
-    # 単勝オッズ。スコア計算にだけ使い、公開データには書き出さない
+    horses: list[Horse] = field(default_factory=list)
+    # 単勝オッズ。スコア計算に使う（各馬の odds があればそこから作る）
     win_odds: list[float] = field(default_factory=list, repr=False)
 
     @property
     def key(self) -> str:
         return f"{self.venue}-{self.number:02d}"
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Race":
+        d = dict(d)
+        d["horses"] = [Horse(**h) for h in d.get("horses", [])]
+        return cls(**d)
 
 
 @dataclass
@@ -37,8 +57,8 @@ class Scored:
     favorites: list[str]
     reasons: list[str]
 
-    def to_public(self) -> dict:
-        """公開用の辞書。生のオッズは含めない。"""
+    def to_dict(self) -> dict:
+        """ページ用の辞書（暗号化して保存する）。"""
         r = asdict(self.race)
         r.pop("win_odds")
         return {

@@ -61,10 +61,19 @@ def test_favorites_add_bonus():
     assert miss.target == 0
 
 
-def test_public_output_has_no_odds():
-    [s] = score_day([race(win_odds=[2.0, 3.0, 5.0])], CFG)
-    assert "win_odds" not in s.to_public()
-    assert "1.0" not in json.dumps(s.to_public())
+def test_saved_day_is_encrypted(tmp_path):
+    from keiba.__main__ import write_day
+    from keiba.crypto import decrypt
+    from keiba.models import Horse
+    from datetime import date
+    r = race(win_odds=[2.0, 3.0, 5.0], horses=[Horse(number=1, name="テストホース", odds=2.0)])
+    write_day(tmp_path, date(2026, 10, 24), [r], CFG, [], "pw")
+    raw = (tmp_path / "latest.json").read_text()
+    assert "テストホース" not in raw and "東京" not in raw
+    day = decrypt(json.loads(raw), "pw")
+    assert day["races"][0]["horses"][0]["name"] == "テストホース"
+    with pytest.raises(Exception):
+        decrypt(json.loads(raw), "wrong")
 
 
 def test_validate_rejects_unparsed_pages():
@@ -78,4 +87,4 @@ def test_validate_rejects_unparsed_pages():
 
 def test_sample_file_loads():
     raw = json.loads((ROOT / "sample" / "races.json").read_text())
-    assert len(score_day([Race(**r) for r in raw["races"]], CFG)) == len(raw["races"])
+    assert len(score_day([Race.from_dict(r) for r in raw["races"]], CFG)) == len(raw["races"])

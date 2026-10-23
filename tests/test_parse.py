@@ -125,3 +125,39 @@ def test_weight_rule():
 def test_day_rows_bare_fillies_mark():
     html = DAY_HTML.replace("2歳未勝利（混合）［指定］", "2歳未勝利牝[指定]")
     assert parse.parse_day_rows(html)[0].fields["fillies_only"]
+
+
+# 出馬表の馬の表（2026年10月に確認した構造を最小限に再現。馬名などは架空）
+RACE_HTML = """
+<div class="cell weight">定量</div>
+<table class="basic narrow-xy mt20">
+<tr><th class="waku">枠</th><th class="num">馬番</th><th class="horse">馬名 / 単勝オッズ(人気)</th>
+<th class="jockey">性齢/毛色<br/>負担重量<br/>騎手名</th><th class="past p1">前走</th></tr>
+<tr><td class="waku"><img alt="枠1白" src="/JRADB/img/waku/1.png"/></td><td class="num">1</td>
+<td class="horse"><div class="name_line"><div class="name"><a href="#">テストアルファ</a></div>
+<div class="odds"><span class="num">3.4</span><span class="pop">(2番人気)</span></div></div>
+<div class="result_line"><div class="cell result">(1.0.0.2)</div></div>
+<p class="trainer"><a href="#">調教師 一郎</a><span class="division">(美浦)</span></p></td>
+<td class="jockey"><p class="age">牝3/鹿毛</p><p class="weight">55.0kg</p><p class="jockey"><a href="#">騎手 太郎</a></p></td>
+<td class="past p1">1着 12.3</td></tr>
+<tr><td class="waku"><img alt="枠2黒" src="/JRADB/img/waku/2.png"/></td><td class="num">2</td>
+<td class="horse"><div class="name_line"><div class="name"><a href="#">テストブラボー</a></div></div>
+<div class="result_line"><div class="cell result">(0.0.0.2)</div></div></td>
+<td class="jockey"><p>牡4/栗毛</p><p>57.0kg</p><p class="jockey">騎手 次郎</p></td></tr>
+<tr><td class="waku"><img alt="枠3赤" src="/JRADB/img/waku/3.png"/></td><td class="num">3</td>
+<td class="horse"><div class="name_line"><div class="name">テストチャーリー</div><div>取消</div></div></td>
+<td class="jockey"><p>セ5/芦毛</p><p>56.0kg</p></td></tr>
+</table>"""
+
+
+def test_parse_horses():
+    a, b, c = parse.parse_horses(RACE_HTML)
+    assert (a.number, a.waku, a.name) == (1, 1, "テストアルファ")
+    assert (a.sex_age, a.weight, a.jockey) == ("牝3", 55.0, "騎手 太郎")
+    assert (a.odds, a.popularity) == (3.4, 2)
+    assert a.trainer == "調教師 一郎"
+    # 発売前（オッズなし）。前走欄の数字や (0.0.0.2) をオッズと取り違えない
+    assert b.odds is None and b.popularity is None
+    assert (b.sex_age, b.weight, b.jockey) == ("牡4", 57.0, "騎手 次郎")
+    assert c.scratched and not a.scratched
+    assert parse.parse_weight_rule(RACE_HTML) == "定量"

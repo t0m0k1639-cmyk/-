@@ -17,6 +17,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import jra
+from .crypto import encrypt
 from .fetch import FetchError, Fetcher
 from .models import Race
 from .score import score_day
@@ -63,13 +64,21 @@ def validate(races: list[Race]) -> list[str]:
     with_odds = sum(1 for r in races if r.win_odds)
     if with_odds < len(races):
         warnings.append(f"オッズを取得できたのは {with_odds}/{len(races)} レースです")
+    with_horses = sum(1 for r in races if r.horses)
+    if with_horses < len(races):
+        warnings.append(f"出走馬を読み取れたのは {with_horses}/{len(races)} レースです")
     if not any(r.going for r in races):
         warnings.append("馬場状態を取得できませんでした")
     return warnings
 
 
+def page_password() -> str | None:
+    return os.environ.get("PAGE_PASSWORD") or None
+
+
 def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
-              warnings: list[str], sample: bool = False) -> None:
+              warnings: list[str], password: str, sample: bool = False) -> None:
+    """出走馬・オッズを含むので、パスワードで暗号化して保存する。"""
     scored = score_day(races, cfg)
     payload = {
         "date": day.isoformat(),
@@ -77,10 +86,10 @@ def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
         "sample": sample,
         "source": "サンプル（架空のデータ）" if sample else "JRA公式サイト（日本中央競馬会）",
         "warnings": warnings,
-        "races": [s.to_public() for s in scored],
+        "races": [s.to_dict() for s in scored],
     }
     (data_dir / "days").mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, ensure_ascii=False, indent=1)
+    text = json.dumps(encrypt(payload, password))
     (data_dir / "days" / f"{day.isoformat()}.json").write_text(text)
     (data_dir / "latest.json").write_text(text)
     dates = sorted((p.stem for p in (data_dir / "days").glob("*.json")), reverse=True)
@@ -103,6 +112,13 @@ def cmd_run(args) -> int:
     cfg = load_config()
     day = date.fromisoformat(args.date) if args.date else datetime.now(JST).date()
     data_dir = Path(args.data)
+    password = page_password()
+    if not password:
+        msg = "ページのパスワード（GitHub の Secret「PAGE_PASSWORD」）が設定されていません"
+        log.error(msg)
+        write_status(data_dir, day, "error", msg)
+        set_output("updated", "true")
+        return 2
     try:
         f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
         race_day, entry_d, entry_o, top_d = jra.is_race_day(f, day)
@@ -127,7 +143,7 @@ def cmd_run(args) -> int:
         write_status(data_dir, day, "error", str(e))
         set_output("updated", "true")
         return 2
-    write_day(data_dir, day, races, cfg, warnings)
+    write_day(data_dir, day, races, cfg, warnings, password)
     log.info("%d レースを書き出しました（リクエスト %d 件）", len(races), f.count)
     set_output("updated", "true")
     return 0
@@ -136,8 +152,12 @@ def cmd_run(args) -> int:
 def cmd_sample(args) -> int:
     cfg = load_config()
     raw = json.loads((ROOT / "sample" / "races.json").read_text())
-    races = [Race(**r) for r in raw["races"]]
-    write_day(Path(args.data), date.fromisoformat(raw["date"]), races, cfg, [], sample=True)
+    races = [Race.from_dict(r) for r in raw["races"]]
+    for r in races:
+        r.win_odds = [h.odds for h in r.horses if h.odds and not h.scratched]
+    password = page_password() or "sample"
+    write_day(Path(args.data), date.fromisoformat(raw["date"]), races, cfg, [], password, sample=True)
+    log.info("サンプルのパスワード: %s", password)
     return 0
 
 

@@ -170,11 +170,6 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 .meter i { display: block; height: 100%; width: 0; background: var(--muted); }
 .score-target .meter i { background: var(--accent); }
 
-.jra-link {
-  display: block; border-top: 1px solid var(--line); padding: 8px 12px;
-  font-size: var(--step--1); font-weight: 700; text-decoration: none; color: var(--accent);
-}
-.jra-link:hover { background: var(--accent-soft); }
 .race-detail { border-top: 1px dashed var(--line); padding: 10px 12px 12px; font-size: var(--step--1); }
 .split { margin: 0 0 6px; font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--muted); }
 .reasons { margin: 0; padding-left: 1.2em; }
@@ -202,3 +197,73 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 @media (prefers-reduced-motion: no-preference) {
   .meter i { transition: width 0.4s ease-out; }
 }
+
+/* パスワード画面 */
+.lock {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px 16px; display: grid; gap: 10px; max-width: 420px; width: 100%; justify-self: center;
+}
+.lock h2 { margin: 0; font-size: var(--step-1); font-weight: 900; }
+.lock p { margin: 0; color: var(--muted); font-size: var(--step--1); }
+.lock input[type="password"] {
+  font: inherit; font-size: 1rem; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--fg); width: 100%;
+}
+.remember { display: flex; align-items: center; gap: 6px; font-size: var(--step--1); color: var(--muted); }
+.lock button {
+  font: inherit; font-weight: 700; border: 0; border-radius: 999px; padding: 10px;
+  background: var(--accent); color: var(--surface); cursor: pointer;
+}
+.lock button:disabled { opacity: 0.6; }
+.lock .lock-error { color: var(--err-fg); background: var(--err-bg); border-radius: 6px; padding: 6px 10px; }
+#content { display: grid; gap: 16px; }
+
+/* 競馬場とオッズ表示の切り替え */
+.chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.toggle {
+  font: inherit; font-size: var(--step--1); font-weight: 700; border: 1px solid var(--line);
+  background: var(--surface); color: var(--muted); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.hide-odds .col-odds { display: none; }
+
+.more { font-size: var(--step--1); color: var(--accent); font-weight: 700; }
+.race-head[aria-expanded="true"] .more { display: none; }
+
+/* 出走馬の表 */
+.horses-wrap { overflow-x: auto; margin: 0 -12px 10px; }
+.horses { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.horses th {
+  text-align: left; font-weight: 700; color: var(--muted); font-size: 0.6875rem;
+  padding: 4px 6px; border-bottom: 1px solid var(--line);
+}
+.horses th:first-child, .horses td:first-child { padding-left: 12px; }
+.horses th:last-child, .horses td:last-child { padding-right: 12px; text-align: right; }
+.horses td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.horses tr:last-child td { border-bottom: 0; }
+.h-num { width: 2.4rem; }
+.h-name { display: block; font-weight: 700; font-size: var(--step-0); overflow-wrap: anywhere; }
+.h-sub { display: block; color: var(--muted); }
+.h-odds { white-space: nowrap; width: 4.5rem; }
+.h-win, .h-pop, .h-none { display: block; }
+.h-win { font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; font-size: var(--step-0); }
+.h-pop { font-size: 0.6875rem; color: var(--muted); }
+.h-pop.top { color: var(--accent); font-weight: 700; }
+.h-none { color: var(--muted); }
+.h-empty { margin: 0; padding: 0 12px; color: var(--muted); }
+.scratched .h-name, .scratched .h-sub { text-decoration: line-through; opacity: 0.6; }
+
+/* 枠の色（JRAの枠色） */
+.waku {
+  display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 5px;
+  font-family: var(--font-num); font-weight: 600; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg);
+}
+.waku-1 { background: #ffffff; color: #1c2320; border-color: #b9bfb6; }
+.waku-2 { background: #1f1f1f; color: #ffffff; border-color: #6b6b6b; }
+.waku-3 { background: #e0262b; color: #ffffff; border-color: #e0262b; }
+.waku-4 { background: #1f5fc8; color: #ffffff; border-color: #1f5fc8; }
+.waku-5 { background: #f7d117; color: #1c2320; border-color: #e3bd00; }
+.waku-6 { background: #1d9a48; color: #ffffff; border-color: #1d9a48; }
+.waku-7 { background: #f08c1c; color: #1c2320; border-color: #f08c1c; }
+.waku-8 { background: #f4a0c0; color: #1c2320; border-color: #e889ad; }
