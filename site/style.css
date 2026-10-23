@@ -364,3 +364,20 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .ped-badge.turf { color: var(--turf); }
 .ped-badge.dirt { color: var(--dirt); }
 .sim-info { margin: 0; font-size: var(--step--1); background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 6px 10px; }
+
+/* 馬場の入力 */
+.baba { display: grid; gap: 6px; margin: 4px 0 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.baba-title { font-size: var(--step--1); font-weight: 700; color: var(--muted); }
+.baba-seg { display: grid; grid-template-columns: 1.7fr repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.baba-seg button {
+  font: inherit; font-size: 0.75rem; border: 0; border-left: 1px solid var(--line); background: var(--surface);
+  color: var(--fg); padding: 7px 2px; cursor: pointer; min-width: 0;
+}
+.baba-seg button:first-child { border-left: 0; }
+.baba-seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+.baba-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--step--1); }
+.baba-num {
+  font: inherit; font-family: var(--font-num); width: 6rem; padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--surface); color: var(--fg);
+}
+.baba-hint { margin: 0; font-size: 0.6875rem; color: var(--muted); }

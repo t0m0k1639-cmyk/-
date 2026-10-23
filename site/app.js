@@ -17,7 +17,9 @@
   const yosoKey = (r) => `${state.day.date}|${r.key}`;
   const yosoOf = (r) => Object.assign({ m: {}, memo: "", adj: {} }, yoso[yosoKey(r)]);
   function saveYoso(r, v) {
-    if (!Object.values(v.m).some(Boolean) && !v.memo && !Object.values(v.adj || {}).some(Boolean)) delete yoso[yosoKey(r)];
+    const b = v.baba || {};
+    if (!Object.values(v.m).some(Boolean) && !v.memo && !Object.values(v.adj || {}).some(Boolean)
+        && !b.going && !b.cushion && !b.moist) delete yoso[yosoKey(r)];
     else yoso[yosoKey(r)] = v;
     store.set("yoso", JSON.stringify(yoso));
   }
@@ -235,7 +237,11 @@
   function renderSim(r, out) {
     out.replaceChildren(el("p", "sim-run", "計算しています…"));
     setTimeout(() => {
-      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), { manual: yosoOf(r).adj, pedigree: state.day.pedigree });
+      const baba = yosoOf(r).baba || {};
+      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), {
+        manual: yosoOf(r).adj, pedigree: state.day.pedigree,
+        cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || "", moist: baba.moist || "" },
+      });
       if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
       const warn = [];
       if (res.byPedigree) {
@@ -247,7 +253,7 @@
         warn.push(el("p", "sim-warn", `前走データがない馬が${res.noData}頭います。その馬は平均扱いで計算しています。`));
       }
       const head = el("p", "sim-head",
-        `${res.course}・馬場${res.going}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
+        `${res.course}・馬場${res.going}${res.goingNote ? `（${res.goingNote}）` : ""}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
       const wrap = el("div", "sim-wrap");
       const table = el("table", "sim-table");
       const thead = el("thead");
@@ -296,7 +302,15 @@
     node.querySelector(".race-name").textContent = raceTitle(r);
     const pill = node.querySelector(".pill");
     if (r.label) { pill.textContent = r.label; pill.classList.add(pillClass(r.label)); }
-    node.querySelector(".race-tags").replaceChildren(...tags(r));
+    const babaNow = () => yosoOf(r).baba || {};
+    const refreshTags = () => {
+      const b = babaNow();
+      node.querySelector(".race-tags").replaceChildren(...tags(Object.assign({}, r, { going: b.going || r.going })));
+      if (b.going && b.going !== r.going) {
+        node.querySelectorAll(".race-tags .tag").forEach((x) => { if (x.textContent.startsWith("馬場")) x.textContent += "（入力）"; });
+      }
+    };
+    refreshTags();
     const horses = r.horses || [];
     const marks = markSummary(r);
     node.querySelector(".more").textContent = marks ? `印 ${marks}` : (horses.length ? `出走馬を見る（${horses.length}頭）` : "詳しく見る");
@@ -325,6 +339,32 @@
     node.querySelector(".split").textContent = `荒れ度の内訳: 条件 ${r.condition_chaos} / オッズ ${mkt}　ズレ ${gap}`;
     const reasons = r.reasons.length ? r.reasons : ["目立つ要素はありません"];
     node.querySelector(".reasons").replaceChildren(...reasons.map((t) => el("li", "", t)));
+
+    // 馬場の入力（シミュレーション用。この端末に保存）
+    const babaBox = node.querySelector(".baba");
+    const seg = babaBox.querySelector(".baba-seg");
+    const isDirt = r.surface === "ダート";
+    const saveBaba = (patch) => { const y = yosoOf(r); y.baba = Object.assign({}, y.baba, patch); saveYoso(r, y); refreshTags(); };
+    ["", "良", "稍重", "重", "不良"].forEach((g) => {
+      const b = Object.assign(el("button", "", g || `JRA発表（${r.going || "未発表"}）`), { type: "button" });
+      b.setAttribute("aria-pressed", String((babaNow().going || "") === g));
+      b.addEventListener("click", () => {
+        saveBaba({ going: g });
+        seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      });
+      seg.append(b);
+    });
+    const num = babaBox.querySelector(".baba-num");
+    num.id = `baba-${r.key}`;
+    babaBox.querySelector(".baba-num-label").textContent = isDirt ? "含水率（%・任意）" : "クッション値（任意）";
+    babaBox.querySelector(".baba-num-label").htmlFor = num.id;
+    num.placeholder = isDirt ? "例 8.5" : "例 9.5";
+    num.value = (isDirt ? babaNow().moist : babaNow().cushion) || "";
+    num.addEventListener("change", () => saveBaba(isDirt ? { moist: num.value.trim() } : { cushion: num.value.trim() }));
+    babaBox.querySelector(".baba-hint").textContent = isDirt
+      ? "含水率を入れると、馬場状態よりそちらを優先して計算します（数字が大きいほど脚抜けが良く前が止まりにくい）。"
+      : "クッション値は10.5以上で硬め（上がりが出やすい）、8以下で軟らかめ（時計がかかり荒れやすい）として計算します。";
+    if (r.surface === "障害") babaBox.hidden = true;
 
     const simBtn = node.querySelector(".sim-btn");
     if (!horses.length || r.surface === "障害") simBtn.disabled = true;

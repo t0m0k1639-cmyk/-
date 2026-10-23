@@ -107,10 +107,19 @@
   }
   function goingEffect(cfg) {
     const dirt = cfg.surface === "dirt";
-    const lvl = GOING_LVL[cfg.going] || 0;
-    const e = { lvl, front: 0, tenMul: 1, agMul: 1, sigma: 0 };
-    if (dirt) { e.front = 0.1 * lvl; e.tenMul = 1 + 0.15 * lvl; }
-    else { e.agMul = 1 - 0.15 * lvl; e.sigma = 0.1 * lvl; e.front = 0.05 * lvl; }
+    let lvl = GOING_LVL[cfg.going] || 0;
+    const m = parseFloat(cfg.moist), cu = parseFloat(cfg.cushion);
+    if (dirt && Number.isFinite(m)) lvl = clamp((m - 5) / 10, 0, 1);   // 含水率が分かればそちらで決める
+    const e = { lvl, front: 0, tenMul: 1, agMul: 1, sigma: 0, txt: [] };
+    if (dirt) { e.front = 0.1 * lvl; e.tenMul = 1 + 0.15 * lvl; if (lvl) e.txt.push("脚抜けが良く前寄り・テン重視"); }
+    else {
+      e.agMul = 1 - 0.15 * lvl; e.sigma = 0.1 * lvl; e.front = 0.05 * lvl;
+      if (lvl) e.txt.push("時計がかかり上がり勝負になりにくい・波乱度アップ");
+      if (Number.isFinite(cu)) {
+        if (cu >= 10.5) { e.agMul *= 1.06; e.txt.push("クッション値高め：硬く速い馬場"); }
+        else if (cu <= 8) { e.agMul *= 0.92; e.sigma += 0.05; e.txt.push("クッション値低め：軟らかい馬場"); }
+      }
+    }
     return e;
   }
 
@@ -302,8 +311,11 @@
     const spec = m.ce.spec;
     const course = spec.straight ? "直線1000m" :
       `${cfg.venue}${cfg.surface === "turf" ? "芝" : "ダ"}${cfg.dist}${cfg.layout || ""}・直線約${spec.L}m・${spec.dir === "R" ? "右" : "左"}回り`;
+    const ge = goingEffect(cfg);
+    const goingLabel = cfg.surface === "dirt" && Number.isFinite(parseFloat(cfg.moist)) ? `含水率${cfg.moist}%`
+      : `${cfg.going}${cfg.surface === "turf" && cfg.cushion !== "" && cfg.cushion != null ? `・クッション値${cfg.cushion}` : ""}`;
     return {
-      rows, sims: N, course, going: cfg.going, noData, byPedigree,
+      rows, sims: N, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
   }
