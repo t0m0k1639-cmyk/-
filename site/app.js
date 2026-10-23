@@ -76,6 +76,9 @@
     const reasons = r.reasons.length ? r.reasons : ["目立つ要素はありません"];
     node.querySelector(".reasons").replaceChildren(...reasons.map((t) => Object.assign(document.createElement("li"), { textContent: t })));
 
+    const jra = node.querySelector(".jra-link");
+    if (r.jra_url) { jra.href = r.jra_url; jra.hidden = false; }
+
     const head = node.querySelector(".race-head");
     const detail = node.querySelector(".race-detail");
     head.addEventListener("click", () => {

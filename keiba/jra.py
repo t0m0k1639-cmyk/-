@@ -16,7 +16,7 @@ from datetime import date
 from urllib.parse import urlparse
 
 from . import parse
-from .fetch import Fetcher
+from .fetch import BASE, Fetcher
 from .models import Race
 
 log = logging.getLogger(__name__)
@@ -65,6 +65,8 @@ def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
         venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
         for row in parse.parse_day_rows(page):
             race = Race(venue=venue, **row.fields)
+            if row.race_link and row.race_link.cname is None:
+                race.jra_url = BASE + row.race_link.path
             if row.race_link:
                 try:
                     html = _open(f, row.race_link)

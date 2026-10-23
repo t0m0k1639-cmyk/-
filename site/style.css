@@ -170,6 +170,11 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 .meter i { display: block; height: 100%; width: 0; background: var(--muted); }
 .score-target .meter i { background: var(--accent); }
 
+.jra-link {
+  display: block; border-top: 1px solid var(--line); padding: 8px 12px;
+  font-size: var(--step--1); font-weight: 700; text-decoration: none; color: var(--accent);
+}
+.jra-link:hover { background: var(--accent-soft); }
 .race-detail { border-top: 1px dashed var(--line); padding: 10px 12px 12px; font-size: var(--step--1); }
 .split { margin: 0 0 6px; font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--muted); }
 .reasons { margin: 0; padding-left: 1.2em; }

@@ -16,6 +16,7 @@ class Race:
     field_size: int | None = None   # 頭数（取消を除く）
     going: str | None = None        # 馬場状態
     post_time: str | None = None    # 発走時刻 "15:40"
+    jra_url: str | None = None      # JRA公式の出馬表ページ
     # 単勝オッズ。スコア計算にだけ使い、公開データには書き出さない
     win_odds: list[float] = field(default_factory=list, repr=False)
 
