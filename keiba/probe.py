@@ -15,9 +15,9 @@ from .fetch import Fetcher
 
 
 def masked(html: str, limit: int = 3000) -> str:
-    """タグと class は残し、3文字以上の日本語の並びを ◯ に置き換える。"""
+    """タグと class は残し、2文字以上の日本語の並びを ◯ に置き換える。"""
     s = re.sub(r"\s+", " ", html)
-    s = re.sub(r"[぀-ヿ一-鿿・ー]{3,}", lambda m: "◯" * len(m.group(0)), s)
+    s = re.sub(r"[぀-ヿ一-鿿・ー]{2,}", lambda m: "◯" * len(m.group(0)), s)
     return s[:limit]
 
 

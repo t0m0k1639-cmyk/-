@@ -1,7 +1,8 @@
 # 朝の狙い目レース
 
-JRA の開催日の朝に、その日の全レースを **荒れ度** と **狙い目** で並べるスマホ向けページです。
-GitHub Actions が毎朝自動でデータを集め、GitHub Pages に公開します。
+JRA の開催日の朝に、その日の全レースを **荒れ度** と **狙い目** で並べ、出走馬とオッズも見られるスマホ向けページです。
+GitHub Actions が毎朝自動でデータを集め、GitHub Pages に置きます。
+データはパスワードで暗号化しているので、パスワードを知っている人（自分）しか中身を見られません。
 
 ## しくみ
 
@@ -9,9 +10,9 @@ GitHub Actions が毎朝自動でデータを集め、GitHub Pages に公開し�
 GitHub Actions（毎日 7:30 と 9:30 JST）
   └ python -m keiba run
       1. JRA公式サイトの出馬表で、今日が開催日か確認（違えばここで終了）
-      2. 全レースの条件（頭数・芝ダ・距離・クラス・ハンデ戦・牝馬限定）を取得
-      3. 単勝オッズと馬場状態を取得
-      4. スコアを計算して data/ に保存（生のオッズは保存しない）
+      2. 開催ページの一覧表から全レースの条件（頭数・芝ダ・距離・クラス・牝馬限定）を取得
+      3. 各レースの出馬表から出走馬・単勝オッズ・ハンデ戦かどうかを取得、馬場状態も取得
+      4. スコアを計算し、パスワードで暗号化して data/ に保存
   └ data/ をコミット → site/ と合わせて GitHub Pages に公開
 ```
 
@@ -21,6 +22,7 @@ GitHub Actions（毎日 7:30 と 9:30 JST）
 | `keiba/parse.py` | HTML から項目を取り出す |
 | `keiba/jra.py` | ページをたどって当日の全レースを集める |
 | `keiba/score.py` | 荒れ度と狙い目の計算 |
+| `keiba/crypto.py` | データの暗号化（ブラウザで復号できる形式） |
 | `config.toml` | スコアの重みと得意条件 |
 | `site/` | 公開ページ（HTML / CSS / JS） |
 | `data/` | 毎朝の計算結果（自動でコミットされる） |
@@ -36,7 +38,7 @@ GitHub Actions（毎日 7:30 と 9:30 JST）
   - 条件は堅めなのにオッズが割れている → **本命妙味**
   - 新馬戦・障害戦・7頭以下はズレの点を割り引きます
 
-オッズはレースを選ぶための計算にだけ使い、各馬の印の判断には使いません。
+スコアの計算では、オッズはレースを選ぶためだけに使います。印を考えるときにオッズを見たくなければ、ページの「オッズ表示」ボタンで隠せます。
 
 重みはすべて仮の値です。`config.toml` で変えられます。
 
@@ -57,8 +59,9 @@ bonus = 15
 
 1. このブランチをデフォルトブランチ（main）にマージする。スケジュール実行はデフォルトブランチでしか動きません
 2. リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にする
-3. （任意）**Settings → Secrets and variables → Actions → Variables** に `KEIBA_CONTACT` を作り、User-Agent に入れる連絡先（URL など）を設定する。未設定ならリポジトリの URL を使います
-4. **Actions → 朝の更新 → Run workflow** を一度手動で実行し、ページが公開されることを確認する
+3. **Settings → Secrets and variables → Actions → Secrets** に `PAGE_PASSWORD` を作り、ページを開くときのパスワードを設定する（未設定だと更新が失敗します）
+4. （任意）**Settings → Secrets and variables → Actions → Variables** に `KEIBA_CONTACT` を作り、User-Agent に入れる連絡先（URL など）を設定する。未設定ならリポジトリの URL を使います
+5. **Actions → 朝の更新 → Run workflow** を一度手動で実行し、ページが公開されることを確認する
 
 ## 手元での確認
 
@@ -66,7 +69,7 @@ bonus = 15
 pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest -q
 
-# 架空のサンプルデータでページを見る
+# 架空のサンプルデータでページを見る（パスワードは sample）
 python -m keiba sample
 python -m keiba build-site --out .preview/site --data .preview/data
 python -m http.server -d .preview/site 8000
@@ -75,6 +78,8 @@ python -m http.server -d .preview/site 8000
 ## データの扱い
 
 - データ元は JRA公式サイト（日本中央競馬会）です。netkeiba など、規約で自動取得が認められていないサイトは使いません
-- 公開ページと `data/` に載せるのは、レース条件の要約と独自に計算したスコアだけです。オッズ表や出馬表そのものは載せず、各レースに JRA公式の出馬表ページへのリンクを付けています
+- 出走馬・オッズを含むデータは、パスワードで暗号化してから `data/` に保存し、ページに置きます。パスワードなしでは中身を読めないので、自分だけが私的に見る使い方になります
+- パスワードを他の人に教えたり、ページの中身を転載したりしないでください（JRA のデータを私的利用の範囲を超えて公表することは規約で禁止されています）
+- 調査用のワークフロー（`probe.yml`）のログは公開されるので、日本語の文字を伏せ字にして構造だけを出しています
 - アクセスは robots.txt に従い、2秒以上の間隔をあけ、1回の実行で150リクエストまでに制限しています
 - JRA のページ構成が変わって読み取れなくなったときは、間違ったデータを公開せずに「取得失敗」と表示し、Actions の実行を失敗扱いにします
