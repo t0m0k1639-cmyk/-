@@ -62,6 +62,12 @@ def main() -> None:
             print("table の class:", t.get("class"))
             for tr in t.find_all("tr")[:3]:
                 print(masked(str(tr), 1500))
+    otop = f.post_cname(*jra.FALLBACK_ENTRY["オッズ"])
+    t = parse.page_text(otop)
+    i = t.find("今週のオッズ")
+    print("\nオッズトップ:", t[i:i + 120] if i >= 0 else "（見出しなし）")
+    print("オッズトップのリンク:", [(a.text, a.cname[:12]) for a in parse.extract_actions(otop)
+                              if a.path.endswith("accessO.html")][:12])
     print("\nリクエスト数:", f.count)
 
 
