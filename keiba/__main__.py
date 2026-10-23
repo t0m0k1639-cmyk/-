@@ -182,7 +182,8 @@ def cmd_build_site(args) -> int:
     shutil.copytree(ROOT / "site", out)
     data = Path(args.data)
     if data.exists():
-        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep"))
+        # 血統の記録（pedigree.json）は集計用でページでは使わないので置かない
+        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep", "pedigree.json"))
     return 0
 
 
