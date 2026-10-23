@@ -201,3 +201,18 @@ def test_parse_past():
 def test_course_detail():
     html = '<div class="cell course"><span class="cap">コース：</span>1,800<span class="detail">（芝・右・外）</span></div>'
     assert parse.parse_course_detail(html) == "芝・右・外"
+
+
+def test_pedigree_and_connections():
+    html = """<table><tr><th>馬名</th></tr><tr><td class="num">1</td><td class="horse">
+    <div class="name_line"><div class="name"><a href="#">テストエコー</a></div></div>
+    <p class="owner">(有)テスト牧場</p><p class="breeder">テストファーム</p>
+    <p class="trainer"><a href="#">調教師 五郎</a><span class="division">(栗東)</span></p>
+    <ul class="family_line"><li class="sire"><span>父：</span>テストサイアー</li>
+    <li class="mare"><span>母：</span>テストメア<span class="bloodmare">(母の父：テストブルード)</span></li></ul>
+    </td><td class="jockey"><p>牡2/黒鹿毛</p><p>55.0kg</p><p class="jockey">騎手 六郎</p></td></tr></table>"""
+    [h] = parse.parse_horses(html)
+    assert (h.sire, h.dam, h.dam_sire) == ("テストサイアー", "テストメア", "テストブルード")
+    assert (h.trainer, h.stable) == ("調教師 五郎", "栗東")
+    assert (h.owner, h.breeder) == ("(有)テスト牧場", "テストファーム")
+    assert h.past == []

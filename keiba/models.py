@@ -16,6 +16,12 @@ class Horse:
     popularity: int | None = None   # 人気
     scratched: bool = False         # 取消・除外
     past: list[dict] = field(default_factory=list)  # 前走から新しい順に最大4走
+    sire: str | None = None         # 父
+    dam: str | None = None          # 母
+    dam_sire: str | None = None     # 母の父
+    stable: str | None = None       # 所属（美浦・栗東）
+    owner: str | None = None        # 馬主
+    breeder: str | None = None      # 生産者
 
 
 @dataclass

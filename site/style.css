@@ -341,3 +341,22 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 440px) { .s-top2 { display: none; } }
 .s-name { max-width: 8.5rem; } .s-mark { width: 1.4rem; }
 .past-detail td { white-space: normal; } .past-list li { overflow-wrap: anywhere; }
+
+/* 血統・補正 */
+.h-info { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; font-size: 0.75rem; }
+.h-info dt { color: var(--muted); font-weight: 700; }
+.h-info dd { margin: 0; overflow-wrap: anywhere; }
+.adj { display: grid; gap: 4px; margin-top: 8px; }
+.adj-label { font-size: 0.6875rem; color: var(--muted); font-weight: 700; }
+.adj-seg { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; max-width: 320px; }
+.adj-seg button {
+  font: inherit; font-size: var(--step--1); font-family: var(--font-num); border: 0; border-left: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); padding: 6px 0; cursor: pointer;
+}
+.adj-seg button:first-child { border-left: 0; }
+.adj-seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+.adj-badge { display: inline-block; font-size: 0.6875rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-top: 2px; }
+.adj-badge.plus { background: var(--hon-soft); color: var(--hon); }
+.adj-badge.minus { background: var(--err-bg); color: var(--err-fg); }
+.sim-warn { margin: 0; font-size: var(--step--1); background: var(--warn-bg); color: var(--warn-fg); border-radius: 6px; padding: 6px 10px; }
+.horses tr.past-detail td { text-align: left; padding-left: 12px; padding-right: 12px; }

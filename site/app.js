@@ -15,9 +15,9 @@
   let yoso = {};
   try { yoso = JSON.parse(store.get("yoso") || "{}") || {}; } catch (_) { yoso = {}; }
   const yosoKey = (r) => `${state.day.date}|${r.key}`;
-  const yosoOf = (r) => yoso[yosoKey(r)] || { m: {}, memo: "" };
+  const yosoOf = (r) => Object.assign({ m: {}, memo: "", adj: {} }, yoso[yosoKey(r)]);
   function saveYoso(r, v) {
-    if (!Object.values(v.m).some(Boolean) && !v.memo) delete yoso[yosoKey(r)];
+    if (!Object.values(v.m).some(Boolean) && !v.memo && !Object.values(v.adj || {}).some(Boolean)) delete yoso[yosoKey(r)];
     else yoso[yosoKey(r)] = v;
     store.set("yoso", JSON.stringify(yoso));
   }
@@ -152,6 +152,8 @@
     main.append(nameBtn);
     const sub = [h.sex_age, h.weight != null ? `${h.weight.toFixed(1)}kg` : null, h.jockey].filter(Boolean).join("・");
     main.append(el("span", "h-sub", h.scratched ? `取消・${sub}` : sub));
+    const adjNow = yosoOf(r).adj[h.number] || 0;
+    if (adjNow) main.append(el("span", `adj-badge ${adjNow > 0 ? "plus" : "minus"}`, `補正${adjNow > 0 ? "+" : ""}${adjNow}`));
     const past = h.past || [];
     if (past.length) {
       const chips = el("span", "h-past");
@@ -171,10 +173,37 @@
     detail.hidden = true;
     const td = el("td");
     td.colSpan = 4;
+    const info = el("dl", "h-info");
+    const addInfo = (k, v) => { if (v) info.append(el("dt", "", k), el("dd", "", v)); };
+    addInfo("血統", [h.sire && `父 ${h.sire}`, h.dam && `母 ${h.dam}`, h.dam_sire && `母の父 ${h.dam_sire}`].filter(Boolean).join("　"));
+    addInfo("調教師", h.trainer && `${h.trainer}${h.stable ? `（${h.stable}）` : ""}`);
+    addInfo("生産者", h.breeder);
+    addInfo("馬主", h.owner);
     const ul = el("ul", "past-list");
     if (past.length) ul.append(...past.map(pastLine));
     else ul.append(el("li", "", "前走のデータはありません（新馬など）"));
-    td.append(ul);
+
+    // 自分の補正（シミュレーションに反映）
+    const adjBox = el("div", "adj");
+    adjBox.append(el("span", "adj-label", "自分の補正（シミュレーションに反映）"));
+    const seg = el("div", "adj-seg");
+    [-2, -1, 0, 1, 2].forEach((v) => {
+      const b = Object.assign(el("button", "", v > 0 ? `+${v}` : v === 0 ? "±0" : String(v)), { type: "button" });
+      b.setAttribute("aria-pressed", String((yosoOf(r).adj[h.number] || 0) === v));
+      b.addEventListener("click", () => {
+        const y = yosoOf(r);
+        y.adj[h.number] = v;
+        if (!v) delete y.adj[h.number];
+        saveYoso(r, y);
+        seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        main.querySelector(".adj-badge")?.remove();
+        if (v) main.insertBefore(el("span", `adj-badge ${v > 0 ? "plus" : "minus"}`, `補正${v > 0 ? "+" : ""}${v}`), main.querySelector(".h-past"));
+      });
+      seg.append(b);
+    });
+    adjBox.append(seg);
+    td.append(info, ul);
+    if (!h.scratched) td.append(adjBox);
     detail.append(td);
     nameBtn.setAttribute("aria-expanded", "false");
     nameBtn.addEventListener("click", () => {
@@ -189,8 +218,14 @@
   function renderSim(r, out) {
     out.replaceChildren(el("p", "sim-run", "計算しています…"));
     setTimeout(() => {
-      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r));
+      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), { manual: yosoOf(r).adj });
       if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
+      const warn = [];
+      if (res.noData >= res.rows.length / 2) {
+        warn.push(el("p", "sim-warn", `${res.rows.length}頭中${res.noData}頭は前走データがありません（新馬など）。能力・脚質・末脚は平均扱いなので、この結果は騎手・枠・自分の補正の差だけで決まっています。馬名をタップして血統や調教師を見て、「自分の補正」を入れてから計算し直すのがおすすめです。`));
+      } else if (res.noData) {
+        warn.push(el("p", "sim-warn", `前走データがない馬が${res.noData}頭います。その馬は平均扱いで計算しています。`));
+      }
       const head = el("p", "sim-head",
         `${res.course}・馬場${res.going}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
       const wrap = el("div", "sim-wrap");
@@ -229,7 +264,7 @@
         if (card) { card.querySelector(".race-head").click(); card.scrollIntoView({ block: "start" }); }
       });
       const note = el("p", "sim-note", "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズと人気は使っていません。勝率は実際の結果で検証した数字ではないので、馬同士の順番と差の目安として見てください。");
-      out.replaceChildren(head, wrap, use, note);
+      out.replaceChildren(head, ...warn, wrap, use, note);
     }, 30);
   }
 

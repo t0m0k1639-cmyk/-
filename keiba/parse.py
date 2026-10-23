@@ -271,13 +271,30 @@ def parse_horses(html: str):
             j = jt.find(class_="jockey") or (jt.find_all("a")[-1] if jt.find_all("a") else None)
             jockey = _text(j) or None
 
-        trainer = _text(horse_td.find(class_="trainer")).split("(")[0].strip() or None
+        trainer_el = horse_td.find(class_="trainer")
+        trainer = _text(trainer_el.find("a") or trainer_el).split("(")[0].strip() or None if trainer_el else None
         row_text = _text(tr.find("td", class_="num")) + _text(horse_td.find(class_="name_line")) + jtext
         past = [p for p in (parse_past(td) for td in tr.select("td.past")) if p]
+        # 血統: li.sire「父：◯◯」/ li.mare「母：◯◯」+ span.bloodmare「(母の父：◯◯)」
+        sire = re.sub(r"^父\s*[:：]\s*", "", _text(horse_td.find(class_="sire"))) or None
+        mare = horse_td.find(class_="mare")
+        dam = dam_sire = None
+        if mare:
+            bm = mare.find(class_="bloodmare")
+            bm_text = _text(bm)
+            if bm:
+                bm.extract()
+            dam = re.sub(r"^母\s*[:：]\s*", "", _text(mare)) or None
+            m = re.search(r"[:：]\s*([^)）]+)", bm_text)
+            dam_sire = m.group(1).strip() if m else (bm_text.strip("()（） ") or None)
+        division = _text(horse_td.find(class_="division")).strip("()（） ") or None
         horses.append(Horse(
             number=number, name=name, waku=waku, sex_age=sex_age, weight=weight,
             jockey=jockey, trainer=trainer, odds=odds, popularity=pop,
             scratched=bool(SCRATCH_RE.search(row_text)), past=past,
+            sire=sire, dam=dam, dam_sire=dam_sire, stable=division,
+            owner=_text(horse_td.find(class_="owner")) or None,
+            breeder=_text(horse_td.find(class_="breeder")) or None,
         ))
     return horses
 

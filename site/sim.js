@@ -231,7 +231,12 @@
     if (running.length < 2) return { error: "出走馬が2頭以上必要です" };
     const hs = running.map((h) => features(h, cfg));
     const n = hs.length;
-    hs.forEach((h, i) => { h.gate = n > 1 ? i / (n - 1) : 0; h.manual = (opts.manual || {})[h.num] || 0; });
+    hs.forEach((h, i) => {
+      h.gate = n > 1 ? i / (n - 1) : 0;
+      h.manual = (opts.manual || {})[h.num] || 0;
+      if (h.manual) h.notes.unshift(`自分の補正${h.manual > 0 ? "+" : ""}${h.manual}`);
+    });
+    const noData = hs.filter((h) => h.cr === null && h.ten === null && h.ag === null).length;
     const m = buildModel(hs, cfg), N = opts.sims || 5000;
     const win = new Array(n).fill(0), top2 = new Array(n).fill(0), top3 = new Array(n).fill(0), sumR = new Array(n).fill(0);
     for (let s = 0; s < N; s++) {
@@ -246,7 +251,7 @@
     const course = spec.straight ? "直線1000m" :
       `${cfg.venue}${cfg.surface === "turf" ? "芝" : "ダ"}${cfg.dist}${cfg.layout || ""}・直線約${spec.L}m・${spec.dir === "R" ? "右" : "左"}回り`;
     return {
-      rows, sims: N, course, going: cfg.going,
+      rows, sims: N, course, going: cfg.going, noData,
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
   }
