@@ -3,8 +3,9 @@ name: 朝の更新
 on:
   schedule:
     # GitHub の cron は UTC。開催日かどうかはスクリプト側で判定する
-    - cron: "30 22 * * *"   # 7:30 JST
-    - cron: "30 0 * * *"    # 9:30 JST
+    # 7:30〜16:30 JST に1時間ごと（UTC では前日22:30〜当日7:30）
+    - cron: "30 22,23 * * *"
+    - cron: "30 0-7 * * *"
   workflow_dispatch:
     inputs:
       date:

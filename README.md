@@ -7,7 +7,7 @@ GitHub Actions が毎朝自動でデータを集め、GitHub Pages に置きま�
 ## しくみ
 
 ```
-GitHub Actions（毎日 7:30 と 9:30 JST）
+GitHub Actions（毎日 7:30〜16:30 JST に1時間ごと）
   └ python -m keiba run
       1. JRA公式サイトの出馬表で、今日が開催日か確認（違えばここで終了）
       2. 開催ページの一覧表から全レースの条件（頭数・芝ダ・距離・クラス・牝馬限定）を取得
