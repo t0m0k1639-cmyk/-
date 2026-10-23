@@ -39,19 +39,19 @@ def main() -> None:
                        parse.BeautifulSoup(page, "html.parser").select("td.odds")[:2]])
     print("オッズのリンク:", [r.odds_link for r in rows[:2]])
 
-    html = jra._open(f, rows[0].race_link)
+    # 前走欄の構造（3歳以上の条件戦の方が過去走が多い）
+    target = next((r for r in rows if r.fields.get("race_class") in ("1勝クラス", "2勝クラス")), rows[0])
+    html = jra._open(f, target.race_link)
     soup = parse.BeautifulSoup(html, "html.parser")
-    for table in soup.find_all("table"):
-        if "馬名" not in table.get_text():
+    shown = 0
+    for td in soup.select("td.past"):
+        if len(td.get_text(strip=True)) < 10:
             continue
-        print("\n=== 馬の表 ===")
-        print("table の class:", table.get("class"))
-        trs = table.find_all("tr")
-        print("行数:", len(trs))
-        for tr in trs[:3]:
-            print("\n--- 行 ---")
-            print(masked(str(tr)))
-        break
+        print("\n--- 前走欄 ---")
+        print(masked(str(td), 2500))
+        shown += 1
+        if shown >= 3:
+            break
 
     if rows[0].odds_link:
         ohtml = jra._open(f, rows[0].odds_link)
