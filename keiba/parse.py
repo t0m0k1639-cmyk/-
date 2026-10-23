@@ -1,0 +1,214 @@
+"""JRA公式サイトの HTML から必要な項目を取り出す。
+
+ページの細かいマークアップに依存しすぎないよう、表示テキストへの正規表現を中心にしている。
+JRA側のページ構成が変わったら、ここを直す。
+"""
+from __future__ import annotations
+
+import re
+import unicodedata
+from dataclasses import dataclass
+
+from bs4 import BeautifulSoup
+
+VENUES = ["札幌", "函館", "福島", "新潟", "東京", "中山", "中京", "京都", "阪神", "小倉"]
+VENUE_RE = "|".join(VENUES)
+
+DOACTION_RE = re.compile(
+    r"doAction\(\s*['\"](/JRADB/[^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]")
+
+
+def norm(s: str) -> str:
+    """全角英数・記号を半角に、連続空白を1つにする。"""
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", s)).strip()
+
+
+def page_text(html: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for t in soup(["script", "style", "noscript"]):
+        t.decompose()
+    return norm(soup.get_text(" "))
+
+
+@dataclass
+class Action:
+    path: str
+    cname: str
+    text: str       # リンク自身の文字
+    context: str    # 周辺（親要素）の文字。日付やレース番号を探すのに使う
+
+
+def extract_actions(html: str) -> list[Action]:
+    soup = BeautifulSoup(html, "html.parser")
+    out: list[Action] = []
+    seen: set[tuple[str, str]] = set()
+    for tag in soup.find_all(True):
+        attrs = " ".join(str(tag.get(a, "")) for a in ("onclick", "href"))
+        m = DOACTION_RE.search(attrs)
+        if not m or (m.group(1), m.group(2)) in seen:
+            continue
+        seen.add((m.group(1), m.group(2)))
+        text = norm(tag.get_text(" ") or " ".join(i.get("alt", "") for i in tag.find_all("img")))
+        ctx_tag, ctx = tag, text
+        for _ in range(4):
+            if ctx_tag.parent is None:
+                break
+            ctx_tag = ctx_tag.parent
+            # 他のリンクも含む親まで上がると、隣の日付やレースの文字を拾ってしまう
+            if len(DOACTION_RE.findall(str(ctx_tag))) > 1:
+                break
+            t = norm(ctx_tag.get_text(" "))
+            if len(t) > 400:
+                break
+            ctx = t
+        out.append(Action(m.group(1), m.group(2), text, ctx))
+    return out
+
+
+def date_patterns(month: int, day: int) -> list[str]:
+    return [f"{month}月{day}日", f"{month:02d}月{day:02d}日", f"{month}/{day}"]
+
+
+def mentions_date(text: str, month: int, day: int) -> bool:
+    return any(p in text for p in date_patterns(month, day))
+
+
+def parse_venue(text: str) -> str | None:
+    m = re.search(rf"\d+回\s*({VENUE_RE})\s*\d+日", text)
+    if m:
+        return m.group(1)
+    m = re.search(VENUE_RE, text)
+    return m.group(0) if m else None
+
+
+def parse_race_number(text: str) -> int | None:
+    m = re.search(r"(?<!\d)(\d{1,2})\s*(?:R|レース)(?![a-zA-Z])", text)
+    if m and 1 <= int(m.group(1)) <= 12:
+        return int(m.group(1))
+    return None
+
+
+def header_part(text: str) -> str:
+    """出馬表の上部（レース条件の部分）。馬の一覧の「牝3」などを拾わないために切り出す。"""
+    cut = len(text)
+    for w in ("馬番", "枠番", "馬名"):
+        i = text.find(w)
+        if 0 < i < cut:
+            cut = i
+    return text[: min(cut, 1500)]
+
+
+CLASS_RULES = [
+    ("G1", r"G\s*(?:1|I)(?![I\d])"),
+    ("G2", r"G\s*(?:2|II)(?![I\d])"),
+    ("G3", r"G\s*(?:3|III)(?![I\d])"),
+    ("リステッド", r"リステッド|\(L\)"),
+    ("オープン", r"オープン"),
+    ("3勝クラス", r"3勝クラス"),
+    ("2勝クラス", r"2勝クラス"),
+    ("1勝クラス", r"1勝クラス"),
+    ("未勝利", r"未勝利"),
+    ("新馬", r"新馬"),
+]
+
+
+def parse_conditions(header: str) -> dict:
+    h = norm(header)
+    out: dict = {}
+    if "障害" in h:
+        out["surface"] = "障害"
+    m = (re.search(r"(芝|ダート|ダ)\s*[・･]?\s*([0-9,]{3,5})\s*(?:メートル|m)", h)
+         or re.search(r"([0-9,]{3,5})\s*(?:メートル|m)\s*\(?\s*(芝|ダート|ダ)", h))
+    if m:
+        a, b = m.groups()
+        surf, dist = (a, b) if not a[0].isdigit() else (b, a)
+        out.setdefault("surface", "ダート" if surf.startswith("ダ") else "芝")
+        out["distance"] = int(dist.replace(",", ""))
+    elif out.get("surface") == "障害":
+        m = re.search(r"([0-9,]{4,5})\s*(?:メートル|m)", h)
+        if m:
+            out["distance"] = int(m.group(1).replace(",", ""))
+    for name, pat in CLASS_RULES:
+        if re.search(pat, h):
+            out["race_class"] = name
+            break
+    out["handicap"] = "ハンデ" in h
+    out["fillies_only"] = bool(re.search(r"\(牝\)|牝馬限定", h))
+    m = re.search(r"(\d{1,2})\s*[時:]\s*(\d{2})\s*分?\s*発走", h)
+    if m:
+        out["post_time"] = f"{int(m.group(1))}:{m.group(2)}"
+    return out
+
+
+SCRATCH_RE = re.compile(r"取消|除外|競走除外")
+
+
+def _rows(html: str):
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        for tr in table.find_all("tr"):
+            cells = [norm(td.get_text(" ")) for td in tr.find_all(["td", "th"])]
+            yield table, tr, cells
+
+
+def parse_field_size(html: str) -> int | None:
+    """出走頭数。馬名の表の行数（取消・除外を除く）から数える。"""
+    best = 0
+    soup = BeautifulSoup(html, "html.parser")
+    for table in soup.find_all("table"):
+        if "馬名" not in table.get_text():
+            continue
+        horses = set()
+        for tr in table.find_all("tr"):
+            cells = [norm(td.get_text(" ")) for td in tr.find_all("td")]
+            row = " ".join(cells)
+            if not cells or SCRATCH_RE.search(row):
+                continue
+            nums = [int(c) for c in cells[:3] if re.fullmatch(r"\d{1,2}", c)]
+            if nums and 1 <= nums[-1] <= 18:
+                horses.add(nums[-1])
+        best = max(best, len(horses))
+    if best:
+        return best
+    m = re.search(r"(\d{1,2})\s*頭", page_text(html))
+    return int(m.group(1)) if m else None
+
+
+def parse_win_odds(html: str) -> list[float]:
+    """単勝オッズを馬番順に返す（取消は除く）。"""
+    odds: dict[int, float] = {}
+    soup = BeautifulSoup(html, "html.parser")
+    for tr in soup.find_all("tr"):
+        tds = tr.find_all("td")
+        if not tds:
+            continue
+        cells = [norm(td.get_text(" ")) for td in tds]
+        if SCRATCH_RE.search(" ".join(cells)):
+            continue
+        num = next((int(c) for c in cells[:3] if re.fullmatch(r"\d{1,2}", c)), None)
+        if num is None or not 1 <= num <= 18:
+            continue
+        val = None
+        for td, c in zip(tds, cells):
+            if "tan" in " ".join(td.get("class", [])) and re.fullmatch(r"\d+(?:,\d{3})*\.\d", c):
+                val = c
+                break
+        if val is None:
+            val = next((c for c in cells if re.fullmatch(r"\d+(?:,\d{3})*\.\d", c)), None)
+        if val is not None:
+            odds.setdefault(num, float(val.replace(",", "")))
+    return [odds[k] for k in sorted(odds)]
+
+
+GOINGS = ["不良", "稍重", "重", "良"]   # 「稍重」を「重」より先に
+
+
+def parse_going(text: str) -> dict[str, str]:
+    """馬場情報ページ1枚から {"芝": "良", "ダート": "稍重"} を返す。"""
+    t = norm(text)
+    out = {}
+    for surf, pat in (("芝", r"芝"), ("ダート", r"ダート")):
+        m = re.search(rf"{pat}\s*[:：]?\s*({'|'.join(GOINGS)})", t)
+        if m:
+            out[surf] = m.group(1)
+    return out

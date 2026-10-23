@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>朝の狙い目レース</title>
+<meta name="description" content="JRA開催日の朝に、全レースを荒れ度と狙い目で並べるページ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>朝の狙い目レース</h1>
+      <p id="meta" class="meta">読み込み中…</p>
+    </div>
+    <label class="date-pick">
+      <span class="sr">日付</span>
+      <select id="date"></select>
+    </label>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="notice" class="notice" hidden></div>
+
+  <section id="top" class="top" aria-label="今日の狙い目" hidden>
+    <h2 class="eyebrow">今日の狙い目 上位3レース</h2>
+    <ol id="top-list" class="top-list"></ol>
+  </section>
+
+  <div class="controls">
+    <div class="seg" role="tablist" aria-label="並べ替え">
+      <button type="button" id="sort-target" data-sort="target" role="tab">狙い目順</button>
+      <button type="button" id="sort-chaos" data-sort="chaos" role="tab">荒れ度順</button>
+      <button type="button" id="sort-number" data-sort="number" role="tab">レース順</button>
+    </div>
+    <div id="venues" class="chips" aria-label="競馬場"></div>
+  </div>
+
+  <ul id="races" class="races"></ul>
+
+  <details class="howto">
+    <summary>スコアの見方</summary>
+    <dl>
+      <dt>荒れ度</dt>
+      <dd>頭数・ハンデ戦・牝馬限定・クラス・馬場・芝ダ・距離から見た「条件の荒れやすさ」と、単勝オッズの分布から見た「市場の混戦度」の平均です。</dd>
+      <dt>狙い目</dt>
+      <dd>条件とオッズのズレの大きさに、得意条件のボーナスを足したものです。ズレの向きでラベルが付きます。</dd>
+      <dt><span class="pill pill-ana">穴狙い向き</span></dt>
+      <dd>条件は荒れやすいのに、人気が一部の馬に集中しているレース。</dd>
+      <dt><span class="pill pill-hon">本命妙味</span></dt>
+      <dd>条件は堅めなのに、オッズが割れているレース。</dd>
+    </dl>
+    <p>オッズはレースを選ぶための計算にだけ使い、各馬の印の判断には使っていません。このページにはオッズ自体は載せていません。</p>
+  </details>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>レース条件・馬場・オッズの出典: JRA公式サイト（日本中央競馬会）。スコアは独自の計算です。</p>
+    <p>出馬表とオッズは <a href="https://www.jra.go.jp/keiba/" target="_blank" rel="noopener">JRA公式サイト</a> で確認してください。</p>
+  </div>
+</footer>
+
+<template id="race-tpl">
+  <li class="race">
+    <button type="button" class="race-head" aria-expanded="false">
+      <span class="plate"><span class="plate-venue"></span><span class="plate-num"></span></span>
+      <span class="race-body">
+        <span class="race-title"><span class="race-name"></span><span class="pill"></span></span>
+        <span class="race-tags"></span>
+      </span>
+      <span class="scores">
+        <span class="score score-target"><span class="score-label">狙い目</span><span class="score-val"></span><span class="meter"><i></i></span></span>
+        <span class="score score-chaos"><span class="score-label">荒れ度</span><span class="score-val"></span><span class="meter"><i></i></span></span>
+      </span>
+    </button>
+    <div class="race-detail" hidden>
+      <p class="split"></p>
+      <ul class="reasons"></ul>
+    </div>
+  </li>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

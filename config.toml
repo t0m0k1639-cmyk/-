@@ -1,0 +1,79 @@
+# 競馬 朝の分析ページの設定
+# 重みは初期値（手作業で決めた仮の値）です。過去の結果で検証しながら調整してください。
+
+[fetch]
+# 1リクエストごとの待ち時間（秒）
+delay_sec = 2.0
+# 1回の実行で送るリクエストの上限
+max_requests = 150
+# User-Agent に入れる連絡先。空なら GitHub リポジトリの URL を使います
+# （環境変数 KEIBA_CONTACT があればそちらが優先）
+contact = ""
+
+# ---- 条件からの荒れ度（合計を 0〜100 に切り詰め）----
+[condition]
+# 頭数: 8頭以下で0点、18頭で満点
+field_size_points = 30
+handicap = 15
+fillies_only = 6
+# 芝の1400m以下
+turf_sprint = 8
+# ダートの1400m以下
+dirt_sprint = 4
+jump = 6
+
+[condition.class]
+"新馬" = 4
+"未勝利" = 8
+"1勝クラス" = 10
+"2勝クラス" = 10
+"3勝クラス" = 8
+"オープン" = 5
+"リステッド" = 5
+"G3" = 7
+"G2" = 4
+"G1" = 3
+
+[condition.going]
+"良" = 0
+"稍重" = 5
+"重" = 9
+"不良" = 13
+
+# ---- 狙い目 ----
+[target]
+# ズレ（標準化した差）がこの値で満点
+gap_full = 2.5
+# ズレ由来の最大点
+gap_points = 70
+# 得意条件ボーナスの上限
+favorite_cap = 30
+# ズレがこれ未満なら「穴狙い向き／本命妙味」のラベルを付けない
+label_threshold = 0.5
+
+# 情報が少ないレースの係数（ズレ由来の点に掛ける）
+[target.info_factor]
+"新馬" = 0.6
+jump = 0.7
+small_field = 0.8   # 7頭以下
+
+# ---- 得意条件 ----
+# 当てはまるとボーナスを加点します。条件は省略すると「何でもよい」扱いです。
+# 使える項目: venue（競馬場）, surface（"芝" / "ダート" / "障害"）,
+#   distance_min, distance_max, class（上の class の名前）, handicap, fillies_only, bonus
+#
+# 例（必要に応じてコメントを外して書き換えてください）:
+# [[favorites]]
+# name = "芝の中距離"
+# surface = "芝"
+# distance_min = 1800
+# distance_max = 2200
+# bonus = 15
+#
+# [[favorites]]
+# name = "中山ダート1200"
+# venue = "中山"
+# surface = "ダート"
+# distance_min = 1200
+# distance_max = 1200
+# bonus = 10

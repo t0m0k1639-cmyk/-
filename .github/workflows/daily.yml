@@ -1,0 +1,74 @@
+name: 朝の更新
+
+on:
+  schedule:
+    # GitHub の cron は UTC。開催日かどうかはスクリプト側で判定する
+    - cron: "30 22 * * *"   # 7:30 JST
+    - cron: "30 0 * * *"    # 9:30 JST
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "対象日 YYYY-MM-DD（空なら今日）"
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: JRA公式サイトから取得してスコアを計算
+        id: run
+        continue-on-error: true
+        env:
+          KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+          TARGET_DATE: ${{ inputs.date }}
+        run: python -m keiba run ${TARGET_DATE:+--date "$TARGET_DATE"}
+
+      - name: data/ をコミット
+        if: steps.run.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M') の更新"
+          git push
+
+      - name: ページを組み立て
+        if: steps.run.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
+        run: python -m keiba build-site --out _site
+
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.run.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4
+        id: deploy
+        if: steps.run.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
+
+      - name: 取得に失敗したら実行を失敗扱いにする（通知のため）
+        if: steps.run.outcome == 'failure'
+        run: |
+          echo "::error::取得に失敗しました。ログと data/status.json を確認してください"
+          exit 1
