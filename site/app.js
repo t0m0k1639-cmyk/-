@@ -234,6 +234,32 @@
 
   function pct(x) { return (x * 100).toFixed(1) + "%"; }
 
+  // 即PATへのリンクと、印のコピー（即PATに買い目を自動で入れる仕組みはJRAにないため、見返す用）
+  const IPAT_URL = "https://www.ipat.jra.go.jp/";
+  function marksText(r, res) {
+    const m = yosoOf(r).m;
+    const mine = MARK_CYCLE.slice(1, 6).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${n}`));
+    const picks = mine.length ? mine : res.rows.filter((x) => x.mark).map((x) => `${x.mark}${x.h.num}`);
+    return `${r.venue}${r.number}R ${raceTitle(r)}\n${picks.join(" ")}${mine.length ? "" : "（シミュレーションの予想印）"}`;
+  }
+  function betBar(r, res) {
+    const bar = el("div", "bet-bar");
+    const link = Object.assign(el("a", "bet-ipat", "即PATを開く ↗"), { href: IPAT_URL, target: "_blank", rel: "noopener" });
+    const copy = Object.assign(el("button", "bet-copy", "印をコピー"), { type: "button" });
+    const msg = el("span", "bet-msg");
+    copy.addEventListener("click", async () => {
+      const text = marksText(r, res);
+      try {
+        await navigator.clipboard.writeText(text);
+        msg.textContent = "コピーしました";
+      } catch (_) {
+        msg.textContent = text.replace("\n", " ");   // コピーできない環境では画面に出して手で写せるように
+      }
+    });
+    bar.append(link, copy, msg);
+    return bar;
+  }
+
   function renderSim(r, out) {
     out.replaceChildren(el("p", "sim-run", "計算しています…"));
     setTimeout(() => {
@@ -290,7 +316,7 @@
         if (card) { card.querySelector(".race-head").click(); card.scrollIntoView({ block: "start" }); }
       });
       const note = el("p", "sim-note", "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズと人気は使っていません。勝率は実際の結果で検証した数字ではないので、馬同士の順番と差の目安として見てください。");
-      out.replaceChildren(head, ...warn, wrap, use, note);
+      out.replaceChildren(head, ...warn, wrap, use, betBar(r, res), note);
     }, 30);
   }
 

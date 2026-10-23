@@ -381,3 +381,13 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
   border-radius: 6px; background: var(--surface); color: var(--fg);
 }
 .baba-hint { margin: 0; font-size: 0.6875rem; color: var(--muted); }
+
+/* 即PAT・印のコピー */
+.bet-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bet-ipat, .bet-copy {
+  font: inherit; font-size: var(--step--1); font-weight: 700; border-radius: 999px; padding: 8px 14px;
+  text-decoration: none; cursor: pointer; border: 1px solid var(--ana);
+}
+.bet-ipat { background: var(--ana); color: var(--surface); }
+.bet-copy { background: transparent; color: var(--ana); }
+.bet-msg { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
