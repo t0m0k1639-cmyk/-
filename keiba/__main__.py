@@ -16,7 +16,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import jra
+from . import jra, pedigree
 from .crypto import encrypt
 from .fetch import FetchError, Fetcher
 from .models import Race
@@ -77,7 +77,8 @@ def page_password() -> str | None:
 
 
 def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
-              warnings: list[str], password: str, sample: bool = False) -> None:
+              warnings: list[str], password: str, sample: bool = False,
+              pedigree_stats: dict | None = None) -> None:
     """出走馬・オッズを含むので、パスワードで暗号化して保存する。"""
     scored = score_day(races, cfg)
     payload = {
@@ -87,6 +88,7 @@ def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
         "source": "サンプル（架空のデータ）" if sample else "JRA公式サイト（日本中央競馬会）",
         "warnings": warnings,
         "races": [s.to_dict() for s in scored],
+        "pedigree": pedigree_stats or {},
     }
     (data_dir / "days").mkdir(parents=True, exist_ok=True)
     text = json.dumps(encrypt(payload, password))
@@ -143,7 +145,14 @@ def cmd_run(args) -> int:
         write_status(data_dir, day, "error", str(e))
         set_output("updated", "true")
         return 2
-    write_day(data_dir, day, races, cfg, warnings, password)
+    # 血統の記録に今日の出馬表の前走欄を足して、今日の出走馬の血統だけ集計する
+    store = pedigree.Store(data_dir / "pedigree.json", password)
+    added = store.add(races, day)
+    store.save()
+    names = {n for r in races for h in r.horses for n in (h.sire, h.dam_sire) if n}
+    log.info("血統の記録: %d 走を追加（合計 %d 走）", added, len(store.runs))
+    write_day(data_dir, day, races, cfg, warnings, password,
+              pedigree_stats=pedigree.summarize(store.runs, names))
     log.info("%d レースを書き出しました（リクエスト %d 件）", len(races), f.count)
     set_output("updated", "true")
     return 0
@@ -156,7 +165,12 @@ def cmd_sample(args) -> int:
     for r in races:
         r.win_odds = [h.odds for h in r.horses if h.odds and not h.scratched]
     password = page_password() or "sample"
-    write_day(Path(args.data), date.fromisoformat(raw["date"]), races, cfg, [], password, sample=True)
+    day = date.fromisoformat(raw["date"])
+    store = pedigree.Store(Path(args.data) / "pedigree.json", password)
+    store.add(races, day)
+    names = {n for r in races for h in r.horses for n in (h.sire, h.dam_sire) if n}
+    write_day(Path(args.data), day, races, cfg, [], password, sample=True,
+              pedigree_stats=pedigree.summarize(store.runs, names))
     log.info("サンプルのパスワード: %s", password)
     return 0
 

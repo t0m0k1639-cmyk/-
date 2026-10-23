@@ -126,6 +126,19 @@
     return el("li", "", parts.filter(Boolean).join("　"));
   }
 
+  // 血統の集計を1行にする（例: 芝 12走・3着内42%／ダ 3走・3着内0%・2歳時 芝5走 → 芝向き）
+  function pedLine(name, role) {
+    const e = name && state.day.pedigree && state.day.pedigree[name] && state.day.pedigree[name][role];
+    if (!e) return name ? "まだ集計がありません" : null;
+    const f = (s, x) => x.n ? `${s} ${x.n}走${x.top3_rate != null ? `・3着内${Math.round(x.top3_rate * 100)}%` : ""}` : `${s} 0走`;
+    const two = ["芝", "ダ"].filter((s) => e.two[s].n).map((s) => `${s}${e.two[s].n}走`).join("・");
+    return `${f("芝", e.all["芝"])}／${f("ダ", e.all["ダ"])}${two ? `（うち2歳時 ${two}）` : ""} → ${e.label}`;
+  }
+  function pedBadge(name) {
+    const e = name && state.day.pedigree && state.day.pedigree[name] && state.day.pedigree[name].sire;
+    return e && (e.label === "芝向き" || e.label === "ダート向き") ? e.label : null;
+  }
+
   function horseRow(h, r, onMark) {
     const tr = el("tr", h.scratched ? "scratched" : "");
     const mk = el("td", "h-mark");
@@ -152,6 +165,8 @@
     main.append(nameBtn);
     const sub = [h.sex_age, h.weight != null ? `${h.weight.toFixed(1)}kg` : null, h.jockey].filter(Boolean).join("・");
     main.append(el("span", "h-sub", h.scratched ? `取消・${sub}` : sub));
+    const pb = pedBadge(h.sire);
+    if (pb) main.append(el("span", `ped-badge ${pb === "芝向き" ? "turf" : "dirt"}`, `父:${pb}`));
     const adjNow = yosoOf(r).adj[h.number] || 0;
     if (adjNow) main.append(el("span", `adj-badge ${adjNow > 0 ? "plus" : "minus"}`, `補正${adjNow > 0 ? "+" : ""}${adjNow}`));
     const past = h.past || [];
@@ -176,6 +191,8 @@
     const info = el("dl", "h-info");
     const addInfo = (k, v) => { if (v) info.append(el("dt", "", k), el("dd", "", v)); };
     addInfo("血統", [h.sire && `父 ${h.sire}`, h.dam && `母 ${h.dam}`, h.dam_sire && `母の父 ${h.dam_sire}`].filter(Boolean).join("　"));
+    addInfo("父の産駒", pedLine(h.sire, "sire"));
+    addInfo("母の父", pedLine(h.dam_sire, "dam_sire"));
     addInfo("調教師", h.trainer && `${h.trainer}${h.stable ? `（${h.stable}）` : ""}`);
     addInfo("生産者", h.breeder);
     addInfo("馬主", h.owner);
@@ -218,9 +235,12 @@
   function renderSim(r, out) {
     out.replaceChildren(el("p", "sim-run", "計算しています…"));
     setTimeout(() => {
-      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), { manual: yosoOf(r).adj });
+      const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), { manual: yosoOf(r).adj, pedigree: state.day.pedigree });
       if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
       const warn = [];
+      if (res.byPedigree) {
+        warn.push(el("p", "sim-info", `前走がない${res.byPedigree}頭は、血統（父の2歳時と全体の成績・母の父の成績、${r.surface === "ダート" ? "ダート" : "芝"}での成績と向き不向き）から能力・脚質・末脚を推定しています。血統の集計は毎週の出馬表から貯めているので、始めのうちは走数が少なめです。`));
+      }
       if (res.noData >= res.rows.length / 2) {
         warn.push(el("p", "sim-warn", `${res.rows.length}頭中${res.noData}頭は前走データがありません（新馬など）。能力・脚質・末脚は平均扱いなので、この結果は騎手・枠・自分の補正の差だけで決まっています。馬名をタップして血統や調教師を見て、「自分の補正」を入れてから計算し直すのがおすすめです。`));
       } else if (res.noData) {

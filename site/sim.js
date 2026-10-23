@@ -114,8 +114,44 @@
     return e;
   }
 
+  // ---- 血統（父・母の父の産駒成績。Python 側の keiba/pedigree.py が集計したもの）
+  // perf は着差ベース（0 が勝ち、-3 が大敗）。能力値に直すときは前走と同じ「基準点 - 6 × 着差」にそろえる
+  function pedStats(ped, name, role, surf) {
+    const e = ped && name && ped[name] && ped[name][role];
+    if (!e) return null;
+    return { all: e.all[surf], two: e.two[surf], apt: e.aptitude, label: e.label };
+  }
+  function aptToward(s, surf) { return s ? (surf === "芝" ? s.apt : -s.apt) : 0; }
+  function pedFeatures(h, cfg, ped) {
+    const surf = cfg.surface === "turf" ? "芝" : "ダ";
+    const sire = pedStats(ped, h.sire, "sire", surf), ds = pedStats(ped, h.dam_sire, "dam_sire", surf);
+    if (!sire && !ds) return null;
+    // 新馬戦は仕上がりの早さが大事なので、父の2歳時の成績を重く見る
+    const parts = [];
+    if (sire && sire.two.n) parts.push([sire.two.perf, 0.5]);
+    if (sire) parts.push([sire.all.perf, 0.3]);
+    if (ds) parts.push([ds.all.perf, 0.2]);
+    const wsum = parts.reduce((a, [, w]) => a + w, 0);
+    const perf = parts.reduce((a, [v, w]) => a + v * w, 0) / wsum;
+    // 芝向き・ダート向き（産駒の芝ダートの成績差と、どちらで多く使われているか）
+    const apt = clamp(0.7 * aptToward(sire, surf) + 0.3 * aptToward(ds, surf), -1.5, 1.5);
+    const src = sire && sire.all.n ? sire.all : ds && ds.all;
+    return {
+      cr: 60 + 6 * perf + 2 * apt,
+      pos: src && src.pos != null ? src.pos : null,
+      kick: src && src.kick != null ? src.kick : null,
+      apt, sire, ds,
+    };
+  }
+  function pedNote(h, p, surf) {
+    const s = p.sire, bits = [];
+    if (s) bits.push(`父${h.sire}（${s.label}・${surf}${s.all.n}走${s.all.top3_rate != null ? `・3着内${Math.round(s.all.top3_rate * 100)}%` : ""}${s.two.n ? `・2歳時${s.two.n}走` : ""}）`);
+    if (p.ds) bits.push(`母の父${h.dam_sire}（${p.ds.label}）`);
+    return "血統で推定：" + bits.join("・");
+  }
+
   // ---- 前走〜4走前 → 能力・位置取り・末脚（元のシミュレーターの馬柱読み込みと同じ計算）
-  function features(h, cfg) {
+  function features(h, cfg, ped) {
     const surf = cfg.surface === "turf" ? "芝" : "ダ";
     const notes = [];
     let posS = 0, posW = 0, kickS = 0, kickW = 0, abS = 0, abW = 0, used = 0, sameUsed = 0;
@@ -147,9 +183,23 @@
     if (discounted.length) notes.push(`${surf === "芝" ? "ダート" : "芝"}戦を割引：${discounted.join("・")}`);
     if (used && !sameUsed) notes.push(`${surf === "芝" ? "芝" : "ダート"}の近走なし`);
     if (!used) notes.push("前走データなし（平均扱い）");
-    const pos = posW ? posS / posW : null;
-    const style = pos === null ? 1 : pos < 0.15 ? 0 : pos < 0.4 ? 1 : pos < 0.7 ? 2 : 3;
+    let pos = posW ? posS / posW : null;
     let ab = abW ? abS / abW : null;
+    let ag = kickW ? kickS / kickW : null;
+    let aptAdj = 0, byPedigree = false;
+    const pf = pedFeatures(h, cfg, ped);
+    if (pf && ab === null && pos === null && ag === null) {
+      // 前走がない馬（新馬など）は血統から推定する
+      ab = pf.cr; pos = pf.pos; ag = pf.kick; byPedigree = true;
+      const i = notes.indexOf("前走データなし（平均扱い）");
+      if (i >= 0) notes.splice(i, 1);
+      notes.push(pedNote(h, pf, surf));
+    } else if (pf && used && !sameUsed && Math.abs(pf.apt) >= 0.2) {
+      // 初めての芝・ダートは、血統の向き不向きで加減点
+      aptAdj = 3 * pf.apt;
+      notes.push(`${surf === "芝" ? "初芝" : "初ダート"}：血統は${pf.apt > 0 ? "向く" : "向かない"}（${(pf.sire || pf.ds).label}）`);
+    }
+    const style = pos === null ? 1 : pos < 0.15 ? 0 : pos < 0.4 ? 1 : pos < 0.7 ? 2 : 3;
     if (ab !== null && notes.some((n) => n.startsWith("休み明け"))) ab -= 1.5;
     const wetN = wW, wetDiff = (wW && gW) ? wS / wW - gS / gW : null;
     if (wW) notes.push(`道悪経験あり${wetDiff === null ? "" : (wetDiff >= 0 ? "（良より好走）" : "（良より低調）")}`);
@@ -159,8 +209,9 @@
     if (ref && h.jockey && ref.jockey && nospace(h.jockey) !== nospace(ref.jockey)) notes.push("乗り替わり");
     if (ref && ref.distance && Math.abs(cfg.dist - ref.distance) >= 200) notes.push(`距離${cfg.dist > ref.distance ? "延長" : "短縮"}${Math.abs(cfg.dist - ref.distance)}m`);
     return {
-      num: h.number, name: h.name, waku: h.waku, cr: ab, ten: pos === null ? null : -pos, ag: kickW ? kickS / kickW : null,
+      num: h.number, name: h.name, waku: h.waku, cr: ab, ten: pos === null ? null : -pos, ag,
       style, notes, pos, wetDiff, wetN, kinDiff, kin: Number.isFinite(h.weight) ? h.weight : null, jkRank: jockeyRank(h.jockey),
+      aptAdj, byPedigree,
     };
   }
 
@@ -183,7 +234,7 @@
     const perKg = 0.9 * clamp(c.dist / 1600, 0.75, 1.4); // 1kg≒0.15秒（1600m基準・距離が長いほど大きく）
     const extra = hs.map((h) => {
       const kinTerm = (kinMean != null && Number.isFinite(h.kin)) ? -perKg * (h.kin - kinMean) : -0.9 * (h.kinDiff || 0);
-      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0);
+      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0);
       if (ge.lvl && h.wetDiff != null) p += ge.lvl * clamp(h.wetDiff, -6, 6) * 0.6 * (h.wetN / (h.wetN + 1.5));
       return p / 5;
     });
@@ -229,7 +280,7 @@
     const cfg = Object.assign(configFor(race), opts.cfg || {});
     const running = (race.horses || []).filter((h) => !h.scratched).sort((a, b) => a.number - b.number);
     if (running.length < 2) return { error: "出走馬が2頭以上必要です" };
-    const hs = running.map((h) => features(h, cfg));
+    const hs = running.map((h) => features(h, cfg, opts.pedigree));
     const n = hs.length;
     hs.forEach((h, i) => {
       h.gate = n > 1 ? i / (n - 1) : 0;
@@ -237,6 +288,7 @@
       if (h.manual) h.notes.unshift(`自分の補正${h.manual > 0 ? "+" : ""}${h.manual}`);
     });
     const noData = hs.filter((h) => h.cr === null && h.ten === null && h.ag === null).length;
+    const byPedigree = hs.filter((h) => h.byPedigree).length;
     const m = buildModel(hs, cfg), N = opts.sims || 5000;
     const win = new Array(n).fill(0), top2 = new Array(n).fill(0), top3 = new Array(n).fill(0), sumR = new Array(n).fill(0);
     for (let s = 0; s < N; s++) {
@@ -251,10 +303,10 @@
     const course = spec.straight ? "直線1000m" :
       `${cfg.venue}${cfg.surface === "turf" ? "芝" : "ダ"}${cfg.dist}${cfg.layout || ""}・直線約${spec.L}m・${spec.dir === "R" ? "右" : "左"}回り`;
     return {
-      rows, sims: N, course, going: cfg.going, noData,
+      rows, sims: N, course, going: cfg.going, noData, byPedigree,
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
   }
 
-  window.RaceSim = { simulate, STYLE_NAMES, MARKS };
+  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS };
 })();
