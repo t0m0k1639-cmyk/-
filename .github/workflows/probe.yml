@@ -22,3 +22,4 @@ jobs:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           TARGET_DATE: ${{ inputs.date }}
         run: python -m keiba.probe --date "$TARGET_DATE"
+      - run: python -m keiba.probe_baba
