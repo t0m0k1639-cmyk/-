@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { day: null, sort: "target", venue: "すべて", showOdds: true, password: null, status: null };
+  const state = { dates: [], day: null, sort: "target", venue: "すべて", showOdds: true, password: null, status: null };
 
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
@@ -571,6 +571,7 @@
 
   function showDay(day) {
     state.day = day;
+    $("date").value = day.date;
     const status = state.status;
     $("meta").textContent = `${fmtDate(day.date)}・${fmtTime(day.generated_at)} 更新・${day.races.length}レース`;
     $("notice").hidden = true;
@@ -600,7 +601,11 @@
 
   async function unlock(password, remember) {
     state.password = password;
-    const day = await loadDay(null);     // 違えば WrongPassword
+    // 前日昼に翌日分を取り込むので、当日のレースが終わる17時までは当日分を先に開く
+    const now = new Date(Date.now() + 9 * 3600e3);
+    const today = now.toISOString().slice(0, 10);
+    const first = state.dates.includes(today) && now.getUTCHours() < 17 ? today : null;
+    const day = await loadDay(first);     // 違えば WrongPassword
     if (remember) store.set("pw", password); else store.del("pw");
     showDay(day);
   }
@@ -654,6 +659,7 @@
       getJSON("data/status.json").catch(() => null),
     ]);
     state.status = status;
+    state.dates = dates;
     const sel = $("date");
     sel.replaceChildren(...dates.map((d) => Object.assign(document.createElement("option"), { value: d, textContent: fmtDate(d) })));
     sel.hidden = dates.length < 2;

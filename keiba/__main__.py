@@ -94,8 +94,10 @@ def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
     (data_dir / "days").mkdir(parents=True, exist_ok=True)
     text = json.dumps(encrypt(payload, password))
     (data_dir / "days" / f"{day.isoformat()}.json").write_text(text)
-    (data_dir / "latest.json").write_text(text)
     dates = sorted((p.stem for p in (data_dir / "days").glob("*.json")), reverse=True)
+    # 翌日分を先に取り込んだあとで当日のレースを取り直しても、latest は翌日分のままにする
+    if dates[0] == day.isoformat():
+        (data_dir / "latest.json").write_text(text)
     (data_dir / "dates.json").write_text(json.dumps(dates))
     write_status(data_dir, day, "ok", "", warnings)
 
