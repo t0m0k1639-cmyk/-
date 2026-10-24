@@ -35,9 +35,13 @@
     "小倉": { "芝1200": 479, "芝1800": 272, "芝2000": 472, "ダ1700": 343 },
   };
   const CLASS_BASE = [["GⅠ", 100], ["G1", 100], ["GⅡ", 94], ["G2", 94], ["GⅢ", 90], ["G3", 90], ["リステッド", 87], ["OP", 86], ["オープン", 86], ["3勝", 80], ["2勝", 74], ["1勝", 68], ["新馬", 60], ["未勝利", 60]];
-  const REC_W = [1, 0.8, 0.6, 0.45];
+  // 近走の重み。2026/10/24 の35レースの検証で、前走だけの能力の方が着順と合っていたので前走を重く見る
+  const REC_W = [1, 0.5, 0.3, 0.2];
   const GOING_LVL = { "良": 0, "稍重": 0.4, "重": 0.8, "不良": 1 };
-  const JK_WEIGHT = { A: 1, B: 0, C: -0.5 };
+  // 同じ検証で上位騎手は着順とやや合っていた（芝で特に）ので、以前より重くする
+  const JK_WEIGHT = { A: 2.5, B: 0, C: -0.5 };
+  // 同じ検証で末脚（走破タイムと上がり3Fの差）は着順とほぼ無関係だったので、効き方を1/4にする
+  const AG_SCALE = 0.25;
   const JK_TOP = ["C.ルメール", "川田将雅", "戸崎圭太", "横山武史", "坂井瑠星", "武豊", "岩田望来", "松山弘平", "鮫島克駿", "西村淳也", "横山和生", "北村友一", "菅原明良", "佐々木大輔"];
 
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -146,9 +150,11 @@
     const apt = clamp(0.7 * aptToward(sire, surf) + 0.3 * aptToward(ds, surf), -1.5, 1.5);
     const src = sire && sire.all.n ? sire.all : ds && ds.all;
     return {
-      cr: 60 + 6 * perf + 2 * apt,
+      // 産駒の成績から1頭の能力を推定するのは当たりにくい（同じ検証で順位相関0.1程度）ので、差を小さめにつける
+      cr: 60 + 3 * perf + 1.5 * apt,
       pos: src && src.pos != null ? src.pos : null,
-      kick: src && src.kick != null ? src.kick : null,
+      // 血統から出した末脚は着順と逆向きだったので使わない
+      kick: null,
       apt, sire, ds,
     };
   }
@@ -264,7 +270,7 @@
     const noiseR = { low: 0.9, mid: 1.2, high: 1.55 }[c.chaos] + ge.sigma;
     const t = c.weight / 100;
     const ce = courseEffect(c);
-    const wTen = (0.15 + 0.5 * (1 - t)) * ce.tenMul * ge.tenMul, wAg = (0.15 + 0.5 * t) * agMul * ce.agMul * ge.agMul;
+    const wTen = (0.15 + 0.5 * (1 - t)) * ce.tenMul * ge.tenMul, wAg = AG_SCALE * (0.15 + 0.5 * t) * agMul * ce.agMul * ge.agMul;
     const postSign = { in: 1, flat: 0, out: -1 }[c.post];
     const styleSign = { front: 1, flat: 0, back: -1 }[c.style];
     const base = hs.map((h, i) => extra[i] + ce.crMul * cr[i] + wTen * ten[i] + wAg * ag[i] + (postSign * k + ce.post) * (1 - 2 * h.gate));
