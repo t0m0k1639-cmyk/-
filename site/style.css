@@ -339,6 +339,7 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .s-bar { width: 1.8rem; }
 .sim-table td, .sim-table th { padding-left: 4px; padding-right: 4px; }
 @media (max-width: 440px) { .s-top2 { display: none; } }
+@media (max-width: 400px) { .s-bar { width: 1.2rem; } .s-name { max-width: 7rem; } }
 .s-name { max-width: 8.5rem; } .s-mark { width: 1.4rem; }
 .past-detail td { white-space: normal; } .past-list li { overflow-wrap: anywhere; }
 
@@ -433,3 +434,9 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .rv-race { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; display: grid; gap: 4px; }
 .h-place { display: block; font-size: 0.6875rem; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .h-place.top { color: var(--hon); font-weight: 700; }
+.sim-table tr.s-hit td { background: var(--hon-soft); }
+.sim-result { background: var(--bg); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; }
+.sim-result-head { margin: 0; font-size: var(--step--1); font-weight: 700; }
+.sim-result-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.sim-result-item { font-size: 0.6875rem; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+.sim-result-item.hit { background: var(--hon-soft); color: var(--hon); border-color: transparent; font-weight: 700; }

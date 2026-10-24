@@ -394,12 +394,16 @@
       const table = el("table", "sim-table");
       const thead = el("thead");
       const htr = el("tr");
+      // 結果が出ているレースは、着順の列と的中の早見を足す
+      const rv = reviewOf(r);
+      const placeNum = (num) => placeOf(rv, num);
       ["予想", "馬番", "馬名・脚質", "勝率", "連対", "複勝"].forEach((t) => htr.append(Object.assign(el("th", t === "連対" ? "s-top2" : "", t), { scope: "col" })));
       thead.append(htr);
       const tbody = el("tbody");
       const maxW = Math.max(...res.rows.map((x) => x.win)) || 1;
       res.rows.forEach((x) => {
-        const tr = el("tr");
+        const p = rv ? placeNum(x.h.num) : null;
+        const tr = el("tr", p && p <= 3 ? "s-hit" : "");
         const nm = el("td", "s-name");
         const sub = el("span", "h-sub", [window.RaceSim.STYLE_NAMES[x.h.style], ...x.h.notes].join("・"));
         sub.title = sub.textContent;
@@ -410,6 +414,7 @@
         w.append(bar, document.createTextNode(pct(x.win)));
         const num = el("td");
         num.append(el("span", `waku waku-${x.h.waku || 0}`, x.h.num));
+        if (rv) num.append(el("span", `h-place${p && p <= 3 ? " top" : ""}`, p ? `${p}着` : "—"));
         tr.append(el("td", "s-mark", x.mark), num, nm, w, el("td", "s-num s-top2", pct(x.top2)), el("td", "s-num", pct(x.top3)));
         tbody.append(tr);
       });
@@ -426,8 +431,31 @@
         if (card) { card.querySelector(".race-head").click(); card.scrollIntoView({ block: "start" }); }
       });
       const note = el("p", "sim-note", "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズと人気は使っていません。勝率は実際の結果で検証した数字ではないので、馬同士の順番と差の目安として見てください。");
-      out.replaceChildren(head, ...warn, wrap, use, betBar(r, res), note);
+      const check = rv ? resultCheck(rv, res.rows.map((x) => x.h.num)) : null;
+      out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, use, betBar(r, res), note);
     }, 30);
+  }
+
+  // シミュレーションの印で買っていたら当たったか（結果が出ているレースだけ）
+  function resultCheck(rv, order) {
+    const pl = (n) => placeOf(rv, n) || 99;
+    const [a, b, c] = order;
+    const top3 = rv.result.slice(0, 3).map((x) => x.number);
+    const box5 = order.slice(0, 5);
+    const items = [
+      ["単勝◎", pl(a) === 1],
+      ["複勝◎", pl(a) <= 3],
+      ["馬連◎○", pl(a) <= 2 && pl(b) <= 2],
+      ["ワイド◎○", pl(a) <= 3 && pl(b) <= 3],
+      ["3連複◎○▲", top3.length === 3 && top3.every((n) => [a, b, c].includes(n))],
+      ["3連複 印5頭BOX", top3.length === 3 && top3.every((n) => box5.includes(n))],
+    ];
+    const box = el("div", "sim-result");
+    box.append(el("p", "sim-result-head", `結果　${rv.result.slice(0, 3).map((x) => `${x.place}着 ${circled(x.number)}`).join("　")}`));
+    const list = el("div", "sim-result-list");
+    for (const [name, hit] of items) list.append(el("span", `sim-result-item${hit ? " hit" : ""}`, `${name} ${hit ? "的中" : "×"}`));
+    box.append(list);
+    return box;
   }
 
   function renderRace(r) {
