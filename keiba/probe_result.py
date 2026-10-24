@@ -37,16 +37,13 @@ def main() -> None:
     print("開催ページの行数:", len(tr))
     for t in tr[:3]:
         print("行:", masked(str(t), 1200))
-    links = [l for l in parse.extract_links(page) if "accessS" in l.path or (l.cname or "").startswith("pw01s")]
-    print("結果へのリンク:", [(l.path, l.cname) for l in links[:4]])
-    if not links:
-        return
-    res = jra._open(f, links[0])
+    a = soup.select_one("th.race_num a[href]")
+    res = jra._open(f, parse.Link(a["href"], None, ""))
     rs = parse.BeautifulSoup(res, "html.parser")
-    for t in rs.select("table")[:2]:
+    for t in rs.select("table"):
         print("\n表の class:", t.get("class"), "行数:", len(t.select("tr")))
         for r in t.select("tr")[:3]:
-            print("行:", masked(str(r), 1500))
+            print("行:", masked(str(r), 2000))
 
 
 if __name__ == "__main__":
