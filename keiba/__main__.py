@@ -188,6 +188,9 @@ def cmd_refresh(args) -> int:
     if not password or not targets or not all(targets) or not path.exists():
         log.error("パスワード・レース指定（例 東京-10、まとめては 東京-10,京都-10）・その日のデータのどれかがありません")
         return 2
+    if day < datetime.now(JST).date():
+        log.error("終わった日（%s）のレースは取り直しません", day)
+        return 2
     wanted = {(m.group(1), int(m.group(2))) for m in targets}
     label = ",".join(f"{v}{n}R" for v, n in sorted(wanted))
     saved = decrypt(json.loads(path.read_text()), password)

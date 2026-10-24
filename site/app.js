@@ -596,6 +596,8 @@
       : "クッション値は入れなければJRA発表の値で計算します。10.5以上で硬め（上がりが出やすい）、8以下で軟らかめ（時計がかかり荒れやすい）。"].filter(Boolean).join("　");
     if (r.surface === "障害") babaBox.hidden = true;
 
+    // 終わった日のレースは取り直さない（JRAのページが次の開催に変わると、別のレースを読んでしまうおそれがある）
+    if (state.day.date < new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)) node.querySelector(".refresh").hidden = true;
     const refreshBtn = node.querySelector(".refresh-btn");
     refreshBtn.addEventListener("click", () => refreshRace(r, node.querySelector(".refresh-msg"), refreshBtn));
 
