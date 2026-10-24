@@ -38,7 +38,7 @@ jobs:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
-        run: python -m keiba.check_day --date "$TARGET_DATE"
+        run: python -m keiba.check_day --date "$TARGET_DATE" --race "新潟-8"
       - if: inputs.kind == 'result'
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
