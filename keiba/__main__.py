@@ -104,7 +104,7 @@ def write_status(data_dir: Path, day: date, state: str, message: str, warnings=(
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "status.json").write_text(json.dumps({
         "date": day.isoformat(),
-        "checked_at": datetime.now(JST).isoformat(timespec="minutes"),
+        "checked_at": datetime.now(JST).isoformat(timespec="seconds"),
         "state": state,
         "message": message,
         "warnings": list(warnings),
