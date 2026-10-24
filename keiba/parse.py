@@ -519,3 +519,17 @@ def parse_going(text: str) -> dict[str, str]:
         if m:
             out[surf] = m.group(1)
     return out
+
+
+def parse_result(html: str) -> list[dict]:
+    """レース結果の表（td.place・td.num・td.pop）を着順に読む。中止・除外などの着順のない馬は除く。"""
+    rows = []
+    for tr in BeautifulSoup(html, "html.parser").select("table tr"):
+        place, num, pop = (tr.find("td", class_=c) for c in ("place", "num", "pop"))
+        if not (place and num):
+            continue
+        p, n = _digits(norm(place.get_text())), _digits(norm(num.get_text()))
+        if p is None or n is None:
+            continue
+        rows.append({"place": p, "number": n, "popularity": _digits(norm(pop.get_text())) if pop else None})
+    return sorted(rows, key=lambda r: r["place"])

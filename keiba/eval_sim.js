@@ -1,6 +1,6 @@
 // シミュレーション（site/sim.js）の予想印と、実際の着順を比べる。
 //   node keiba/eval_sim.js 復号済みの日のデータ.json 着順.json
-// 着順.json は {"東京-11": [1着の馬番, 2着の馬番, ...]}。
+// 着順.json は {"東京-11": [{place, number, popularity}, ...]}（人気は確定時のもの）。
 // ログは公開されるので、馬名・オッズは出さず、着順と人気の数字だけを出す。
 "use strict";
 const fs = require("fs");
@@ -24,8 +24,9 @@ const rate = (s, k) => (s.n ? `${((100 * (s[k] || 0)) / s.n).toFixed(0)}%` : "-"
 console.log("レース | 条件 | 頭数 | ◎の着順(人気) | ○ | ▲ | 1番人気の着順 | 3連複(印5頭)");
 for (const r of day.races) {
   const key = `${r.venue}-${r.number}`;
-  const order = results[key];
-  if (!order || !order.length) continue;
+  const result = results[key];
+  if (!result || !result.length) continue;
+  const order = result.map((x) => x.number);
   const res = simulate(Object.assign({ date: day.date }, r), {
     pedigree: day.pedigree, sims: 5000,
     cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "" },
@@ -34,8 +35,8 @@ for (const r of day.races) {
   const pos = (num) => { const i = order.indexOf(num); return i < 0 ? 99 : i + 1; };
   const marks = res.rows.map((x) => x.h.num);
   const horses = (r.horses || []).filter((h) => !h.scratched);
-  const pop = (num) => (horses.find((h) => h.number === num) || {}).popularity || null;
-  const fav = horses.find((h) => h.popularity === 1);
+  const pop = (num) => (result.find((x) => x.number === num) || {}).popularity || null;
+  const fav = result.find((x) => x.popularity === 1);
   const top3 = order.slice(0, 3);
   const g = ["全体", r.surface || "?", r.race_class && r.race_class.includes("新馬") ? "新馬" : "新馬以外",
     res.noData + res.byPedigree > horses.length / 3 ? "データ少" : "データ十分"];
@@ -51,10 +52,7 @@ for (const r of day.races) {
     add(g, "favN", 1);
     add(g, "favWin", pos(fav.number) === 1 ? 1 : 0);
     add(g, "favTop3", pos(fav.number) <= 3 ? 1 : 0);
-  }
-  const p = horses.map((h) => h.popularity).filter(Boolean);
-  if (p.length) {
-    const byPop = horses.filter((h) => h.popularity).sort((a, b) => a.popularity - b.popularity).map((h) => h.number);
+    const byPop = result.filter((x) => x.popularity).sort((a, b) => a.popularity - b.popularity).map((x) => x.number);
     add(g, "popTrio5", top3.every((m) => byPop.slice(0, 5).includes(m)) ? 1 : 0);
     add(g, "winnerPop", pop(order[0]) || 0);
   }

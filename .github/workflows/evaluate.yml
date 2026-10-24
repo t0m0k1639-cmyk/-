@@ -1,0 +1,29 @@
+name: 予想と結果の比較
+
+# その日のレース結果を JRA公式サイトから取り込み、シミュレーションの予想印と比べる。
+# ログは公開されるので、馬名・オッズは出さず、着順と人気の数字だけを出す
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "対象日 YYYY-MM-DD（空なら今日）"
+        required: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - env:
+          KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          TARGET_DATE: ${{ inputs.date }}
+        run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"}

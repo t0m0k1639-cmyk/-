@@ -253,3 +253,14 @@ def test_body_weight():
     # 発表前（戦績だけ）は読まない。前走欄の馬体重とも取り違えない
     [d] = parse.parse_horses(base.format(n=4, w='<div class="cell result">(0.0.0.2)</div>'))
     assert d.body_weight is None and d.body_weight_diff is None
+
+
+def test_parse_result():
+    html = """<table><tr><th class="place">着順</th></tr>
+    <tr><td class="place">2</td><td class="num">8</td><td class="pop">3</td></tr>
+    <tr><td class="place">1</td><td class="num">12</td><td class="pop">1</td></tr>
+    <tr><td class="place">中止</td><td class="num">5</td><td class="pop">9</td></tr></table>"""
+    assert parse.parse_result(html) == [
+        {"place": 1, "number": 12, "popularity": 1},
+        {"place": 2, "number": 8, "popularity": 3},
+    ]

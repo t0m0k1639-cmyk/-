@@ -152,3 +152,25 @@ def merge_going(races: list[Race], going: dict, baba: dict | None = None) -> Non
         elif r.surface == "芝":
             r.moist, r.cushion = b.get("moist_turf"), b.get("cushion")
             r.baba_time = b.get("cushion_time") or b.get("moist_time")
+
+
+def collect_results(f: Fetcher, today: date) -> dict[str, list[dict]]:
+    """当日の全レースの着順を {"東京-11": [{place, number, popularity}, ...]} で返す。"""
+    home = parse.extract_actions(f.get("/"))
+    entry = next(((a.path, a.cname) for a in home if a.path.endswith("accessS.html") and "pw01sli" in a.cname),
+                 ("/JRADB/accessS.html", "pw01sli00/AF"))
+    top = f.post_cname(*entry)
+    out: dict[str, list[dict]] = {}
+    for day in _day_actions(top, "accessS.html", today):
+        venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
+        for row in parse.parse_day_rows(f.post_cname(day.path, day.cname)):
+            if not row.race_link:
+                continue
+            try:
+                res = parse.parse_result(_open(f, row.race_link))
+            except Exception as e:
+                log.warning("%s%dR の結果を読めませんでした: %s", venue, row.fields["number"], e)
+                continue
+            if res:
+                out[f"{venue}-{row.fields['number']}"] = res
+    return out

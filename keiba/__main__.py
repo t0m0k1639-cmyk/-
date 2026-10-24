@@ -11,7 +11,9 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import sys
+import tempfile
 import tomllib
 from datetime import date, datetime
 from pathlib import Path
@@ -238,6 +240,31 @@ def cmd_build_site(args) -> int:
     return 0
 
 
+def cmd_evaluate(args) -> int:
+    """その日のレース結果を取り込み、シミュレーションの予想印と比べる（ログには数字だけを出す）。"""
+    cfg = load_config()
+    day = date.fromisoformat(args.date) if args.date else datetime.now(JST).date()
+    path = Path(args.data) / "days" / f"{day.isoformat()}.json"
+    password = page_password()
+    if not password or not path.exists():
+        log.error("パスワードかその日のデータがありません")
+        return 2
+    saved = decrypt(json.loads(path.read_text()), password)
+    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
+    results = jra.collect_results(f, day)
+    log.info("結果を取得: %d レース", len(results))
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "day.json").write_text(json.dumps(saved, ensure_ascii=False))
+        (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))
+        out = subprocess.run(["node", str(ROOT / "keiba" / "eval_sim.js"), f"{tmp}/day.json", f"{tmp}/res.json"],
+                             capture_output=True, text=True, check=True).stdout
+    print(out)
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+            fh.write(f"## {day} の予想と結果\n\n```\n{out}\n```\n")
+    return 0
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="keiba")
@@ -249,13 +276,16 @@ def main(argv=None) -> int:
     rf.add_argument("--race", required=True, help="例: 東京-10")
     rf.add_argument("--date")
     rf.add_argument("--data", default=str(ROOT / "data"))
+    e = sub.add_parser("evaluate")
+    e.add_argument("--date")
+    e.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "refresh": cmd_refresh, "sample": cmd_sample,
+    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "sample": cmd_sample,
             "build-site": cmd_build_site}[args.cmd](args)
 
 
