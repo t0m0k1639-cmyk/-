@@ -7,7 +7,7 @@ on:
         description: "対象日 YYYY-MM-DD"
         required: true
       kind:
-        description: "調べるもの（all / result）"
+        description: "調べるもの（all / result / site）"
         required: false
         default: "all"
 
@@ -25,10 +25,14 @@ jobs:
       - env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           TARGET_DATE: ${{ inputs.date }}
-        if: inputs.kind != 'result'
+        if: inputs.kind == 'all'
         run: python -m keiba.probe --date "$TARGET_DATE"
-      - if: inputs.kind != 'result'
+      - if: inputs.kind == 'all'
         run: python -m keiba.probe_baba
+      - if: inputs.kind == 'site'
+        env:
+          TARGET_URL: ${{ inputs.date }}
+        run: python -m keiba.probe_site "$TARGET_URL"
       - if: inputs.kind == 'result'
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
