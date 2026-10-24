@@ -37,7 +37,12 @@ def main() -> None:
             for m in re.finditer(r"(?i)\.(json|xml|csv|js)\b[^\"']*", html):
                 pass
             print("データファイルらしきもの:", sorted(set(re.findall(r'["\']([^"\']*(?:baba|cushion|moist)[^"\']*\.(?:json|xml|csv|js))["\']', html)))[:20])
+    for i2, html in enumerate([first]):
+        for m in re.finditer(r"_\w*data\w*\s*=\s*[\[{]", html):
+            print("\n=== 変数", re.sub(r"\s+", " ", html[m.start():m.start() + 700]))
     js = f.get("/keiba/baba/_js/baba2025.js")
+    m = re.search(r"_cushion_data\s*=", js)
+    print("\nJS内の _cushion_data 定義:", re.sub(r"\s+", " ", js[m.start():m.start() + 400]) if m else "なし")
     print("\n=== baba2025.js（cushion・url・ajax を含む行）===")
     for line in js.splitlines():
         if re.search(r"(?i)cushion|\.json|\.xml|\.csv|ajax|\$\.get|fetch\(|url", line):
