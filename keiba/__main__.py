@@ -244,11 +244,16 @@ def cmd_evaluate(args) -> int:
     """その日のレース結果を取り込み、シミュレーションの予想印と比べる（ログには数字だけを出す）。"""
     cfg = load_config()
     day = date.fromisoformat(args.date) if args.date else datetime.now(JST).date()
-    path = Path(args.data) / "days" / f"{day.isoformat()}.json"
+    data_dir = Path(args.data)
+    path = data_dir / "days" / f"{day.isoformat()}.json"
     password = page_password()
-    if not password or not path.exists():
-        log.error("パスワードかその日のデータがありません")
+    if not password:
+        log.error("パスワードがありません")
         return 2
+    if not path.exists():
+        log.info("%s のデータがないので比べません（開催日でない）", day)
+        set_output("updated", "false")
+        return 0
     saved = decrypt(json.loads(path.read_text()), password)
     f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
     results = jra.collect_results(f, day)
@@ -257,10 +262,21 @@ def cmd_evaluate(args) -> int:
         (Path(tmp) / "day.json").write_text(json.dumps(saved, ensure_ascii=False))
         (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))
         out = "\n".join(
-            subprocess.run(["node", str(ROOT / "keiba" / js), f"{tmp}/day.json", f"{tmp}/res.json"],
+            subprocess.run(["node", str(ROOT / "keiba" / js), f"{tmp}/day.json", f"{tmp}/res.json"]
+                           + ([f"{tmp}/page.json"] if js == "eval_sim.js" else []),
                            capture_output=True, text=True, check=True).stdout
             for js in ("eval_sim.js", "diag_sim.js"))
+        page = json.loads((Path(tmp) / "page.json").read_text())
     print(out)
+    if not results:
+        log.warning("結果がまだありません")
+        set_output("updated", "false")
+        return 0
+    # ページで見る用。着順と予想印を含むので、出馬表と同じく暗号化して置く
+    page.update(date=day.isoformat(), evaluated_at=datetime.now(JST).isoformat(timespec="minutes"))
+    (data_dir / "results").mkdir(parents=True, exist_ok=True)
+    (data_dir / "results" / f"{day.isoformat()}.json").write_text(json.dumps(encrypt(page, password)))
+    set_output("updated", "true")
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
             fh.write(f"## {day} の予想と結果\n\n```\n{out}\n```\n")

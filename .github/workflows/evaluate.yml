@@ -1,18 +1,34 @@
 name: 予想と結果の比較
 
 # その日のレース結果を JRA公式サイトから取り込み、シミュレーションの予想印と比べる。
+# 比べた結果は暗号化して data/results/ に置き、ページで見られるようにする。
 # ログは公開されるので、馬名・オッズは出さず、着順と人気の数字だけを出す
 on:
+  schedule:
+    # 毎日 17:37 JST（UTC 8:37）。開催日でなければ何もしない
+    - cron: "37 8 * * *"
   workflow_dispatch:
     inputs:
       date:
         description: "対象日 YYYY-MM-DD（空なら今日）"
         required: false
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,8 +38,30 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - env:
+      - name: 結果を取り込んで予想と比べる
+        id: run
+        env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
         run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"}
+      - name: data/ をコミット
+        id: commit
+        if: steps.run.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M') 予想と結果の比較"
+          git pull --rebase -q || { git rebase --abort; echo "::error::data/ が重なったので公開を中止しました"; exit 1; }
+          git push
+      - run: python -m keiba build-site --out _site
+        if: steps.commit.outcome == 'success'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.commit.outcome == 'success'
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deploy
+        if: steps.commit.outcome == 'success'

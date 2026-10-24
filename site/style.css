@@ -418,3 +418,18 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 /* 馬体重 */
 .bw { display: block; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bw-big { color: var(--err-fg); font-weight: 700; }
+
+/* 予想と結果（レース後の比較） */
+.review { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: grid; gap: 8px; }
+.review .eyebrow { margin: 0; }
+.rv-meta, .rv-sub { margin: 0; font-size: 0.75rem; color: var(--muted); }
+.rv-line { margin: 0; font-size: var(--step--1); }
+.rv-table { border-collapse: collapse; width: 100%; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+.rv-table th, .rv-table td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: right; }
+.rv-table th:first-child { text-align: left; font-weight: 700; }
+.rv-table tr:first-child th { color: var(--muted); font-weight: 700; font-size: 0.75rem; }
+.rv-chip { font-size: 0.6875rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.rv-chip.hit { background: var(--hon-soft); color: var(--hon); border-color: transparent; }
+.rv-race { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; display: grid; gap: 4px; }
+.h-place { display: block; font-size: 0.6875rem; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.h-place.top { color: var(--hon); font-weight: 700; }

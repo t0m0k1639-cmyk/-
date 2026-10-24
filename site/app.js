@@ -163,6 +163,8 @@
     mk.append(btn);
     const num = el("td", "h-num");
     num.append(el("span", `waku waku-${h.waku || 0}`, h.number));
+    const place = placeOf(reviewOf(r), h.number);
+    if (place) num.append(el("span", `h-place${place <= 3 ? " top" : ""}`, `${place}着`));
     const main = el("td", "h-main");
     const nameBtn = Object.assign(el("button", "h-name"), { type: "button", textContent: h.name });
     main.append(nameBtn);
@@ -445,6 +447,26 @@
       }
     };
     refreshTags();
+    const rv = reviewOf(r);
+    if (rv && rv.sim) {
+      const hon = rv.sim[0];
+      const p = placeOf(rv, hon.num);
+      node.querySelector(".race-title").append(el("span", `rv-chip${p && p <= 3 ? " hit" : ""}`, `◎${circled(hon.num)} ${p ? `${p}着` : "—"}`));
+    }
+    if (rv) {
+      const box = el("div", "rv-race");
+      const top = rv.result.slice(0, 3).map((x) => `${x.place}着 ${circled(x.number)}${x.popularity ? `（${x.popularity}人気）` : ""}`).join("　");
+      box.append(el("p", "rv-line", `結果　${top}`));
+      if (rv.sim) {
+        box.append(el("p", "rv-line", `シミュレーション　${rv.sim.slice(0, 5).map((x) => `${x.mark}${circled(x.num)} ${placeOf(rv, x.num) || "—"}着`).join("　")}`));
+      } else if (rv.note) {
+        box.append(el("p", "rv-line", `シミュレーション　対象外（${rv.note}）`));
+      }
+      const m = yosoOf(r).m;
+      const mine = MARK_CYCLE.slice(1).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${circled(+n)} ${placeOf(rv, +n) || "—"}着`));
+      if (mine.length) box.append(el("p", "rv-line", `自分の印　${mine.join("　")}`));
+      node.querySelector(".race-detail").prepend(box);
+    }
     const horses = r.horses || [];
     const marks = markSummary(r);
     node.querySelector(".more").textContent = marks ? `印 ${marks}` : (horses.length ? `出走馬を見る（${horses.length}頭）` : "詳しく見る");
@@ -582,7 +604,69 @@
 
   async function loadDay(dateStr) {
     const env = await getJSON(dateStr ? `data/days/${dateStr}.json` : "data/latest.json");
-    return decrypt(env, state.password);
+    const day = await decrypt(env, state.password);
+    // レース後に自動で比べた結果（keiba evaluate）。まだなければ null
+    try {
+      day.review = await decrypt(await getJSON(`data/results/${day.date}.json`), state.password);
+    } catch (_) {
+      day.review = null;
+    }
+    return day;
+  }
+
+  // ---- 予想と結果（レース後の比較）
+  const reviewOf = (r) => (state.day.review ? state.day.review.races.find((x) => x.key === r.key) : null);
+  const circled = (n) => (n >= 1 && n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `(${n})`);
+  function placeOf(rv, num) {
+    const x = rv && rv.result.find((y) => y.number === num);
+    return x ? x.place : null;
+  }
+  function renderReview(day) {
+    const box = $("review");
+    const rv = day.review;
+    box.hidden = !rv;
+    if (!rv) return;
+    const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "—");
+    const g = rv.groups["全体"] || {};
+    // 自分の印（この端末に保存したもの）
+    let myN = 0, myWin = 0, myTop3 = 0, markN = 0, markTop3 = 0;
+    for (const r of day.races) {
+      const x = rv.races.find((y) => y.key === r.key);
+      if (!x) continue;
+      const m = yosoOf(r).m;
+      const hon = Object.keys(m).find((n) => m[n] === "◎");
+      if (hon) { myN++; const p = placeOf(x, +hon); if (p === 1) myWin++; if (p && p <= 3) myTop3++; }
+      for (const n of Object.keys(m)) { if (m[n] && m[n] !== "✕") { markN++; const p = placeOf(x, +n); if (p && p <= 3) markTop3++; } }
+    }
+    const table = el("table", "rv-table");
+    table.append(el("tr", "", ""));
+    table.firstChild.append(el("th", "", ""), el("th", "", "1着"), el("th", "", "3着以内"), el("th", "", "レース数"));
+    const row = (name, a, b, n) => { const tr = el("tr"); tr.append(el("th", "", name), el("td", "", a), el("td", "", b), el("td", "", String(n))); table.append(tr); };
+    row("シミュレーションの◎", pct(g.honWin || 0, g.n), pct(g.honTop3 || 0, g.n), g.n || 0);
+    row("1番人気", pct(g.favWin || 0, g.favN), pct(g.favTop3 || 0, g.favN), g.favN || 0);
+    if (myN) row("自分の◎", pct(myWin, myN), pct(myTop3, myN), myN);
+    const lines = [
+      `3連複（印の上位5頭のボックス）：シミュレーション ${pct(g.trio5 || 0, g.n)}　人気上位5頭 ${pct(g.popTrio5 || 0, g.favN)}`,
+    ];
+    if (markN) lines.push(`自分が印（✕以外）を付けた馬 ${markN}頭のうち、3着以内 ${markTop3}頭（${pct(markTop3, markN)}）`);
+    const cal = el("table", "rv-table");
+    const ch = el("tr");
+    ch.append(el("th", "", "複勝率の予想"), el("th", "", "馬の数"), el("th", "", "予想の平均"), el("th", "", "実際"));
+    cal.append(ch);
+    for (const c of rv.calib.filter((c) => c.n)) {
+      const tr = el("tr");
+      tr.append(el("th", "", `${Math.round(c.lo * 100)}〜${Math.round(Math.min(c.hi, 1) * 100)}%`), el("td", "", String(c.n)),
+        el("td", "", pct(c.pred, c.n)), el("td", "", pct(c.hit, c.n)));
+      cal.append(tr);
+    }
+    box.replaceChildren(
+      el("h2", "eyebrow", "予想と結果"),
+      el("p", "rv-meta", `${fmtTime(rv.evaluated_at)} に JRA公式サイトの着順と比べました。シミュレーションはレース後に同じ計算で出し直したもので、自分の補正・調教・手で入れた馬場は入っていません。`),
+      table,
+      ...lines.map((t) => el("p", "rv-line", t)),
+      el("p", "rv-sub", "シミュレーションの複勝率は当てになるか（予想の平均と実際が近いほど信頼できる）"),
+      cal,
+    );
   }
 
   function showDay(day) {
@@ -600,6 +684,7 @@
     }
     $("lock").hidden = true;
     $("content").hidden = false;
+    renderReview(day);
     renderTop(day.races);
     renderVenues(day.races);
     renderOddsToggle();

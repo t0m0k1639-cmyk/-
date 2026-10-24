@@ -1,5 +1,5 @@
 // シミュレーション（site/sim.js）の予想印と、実際の着順を比べる。
-//   node keiba/eval_sim.js 復号済みの日のデータ.json 着順.json
+//   node keiba/eval_sim.js 復号済みの日のデータ.json 着順.json [ページ用の出力.json]
 // 着順.json は {"東京-11": [{place, number, popularity}, ...]}（人気は確定時のもの）。
 // ログは公開されるので、馬名・オッズは出さず、着順と人気の数字だけを出す。
 "use strict";
@@ -13,6 +13,10 @@ const day = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const results = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 
 const groups = {};
+const raceOut = [];
+// シミュレーションの複勝率が、実際の3着内率と合っているか（複勝率の帯ごと）
+const CALIB = [[0, 0.1], [0.1, 0.2], [0.2, 0.3], [0.3, 0.5], [0.5, 1.01]];
+const calib = CALIB.map(([lo, hi]) => ({ lo, hi, n: 0, pred: 0, hit: 0 }));
 function add(names, k, v) {
   for (const g of names) {
     const s = (groups[g] = groups[g] || {});
@@ -31,7 +35,11 @@ for (const r of day.races) {
     pedigree: day.pedigree, sims: 5000,
     cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "" },
   });
-  if (res.error) { console.log(`${key} | 対象外（${res.error}）`); continue; }
+  if (res.error) {
+    console.log(`${key} | 対象外（${res.error}）`);
+    raceOut.push({ key, result, sim: null, note: res.error });
+    continue;
+  }
   const pos = (num) => { const i = order.indexOf(num); return i < 0 ? 99 : i + 1; };
   const marks = res.rows.map((x) => x.h.num);
   const horses = (r.horses || []).filter((h) => !h.scratched);
@@ -57,6 +65,11 @@ for (const r of day.races) {
     add(g, "winnerPop", pop(order[0]) || 0);
   }
   add(g, "honPop", pop(marks[0]) || 0);
+  for (const x of res.rows) {
+    const c = calib.find((b) => x.top3 >= b.lo && x.top3 < b.hi);
+    c.n++; c.pred += x.top3; c.hit += pos(x.h.num) <= 3 ? 1 : 0;
+  }
+  raceOut.push({ key, result, sim: res.rows.map((x) => ({ num: x.h.num, mark: x.mark, win: +x.win.toFixed(3), top3: +x.top3.toFixed(3) })) });
   console.log([key, `${r.surface}${r.distance} ${r.race_class || ""}`, horses.length,
     `${pos(marks[0])}着(${pop(marks[0]) || "-"})`, `${pos(marks[1])}着`, `${pos(marks[2])}着`,
     fav ? `${pos(fav.number)}着` : "-", top3.every((m) => marks.slice(0, 5).includes(m)) ? "的中" : ""].join(" | "));
@@ -68,4 +81,13 @@ for (const [name, s] of Object.entries(groups)) {
     rate(s, "trio3"), rate(s, "trio5"), (s.inTop3 / s.n).toFixed(2),
     s.favN ? `${((100 * s.favWin) / s.favN).toFixed(0)}%` : "-", s.favN ? `${((100 * s.favTop3) / s.favN).toFixed(0)}%` : "-",
     rate(s, "popTrio5"), (s.honPop / s.n).toFixed(1), (s.winnerPop / s.n).toFixed(1)].join(" | "));
+}
+
+console.log("\nシミュレーションの複勝率 | 頭数 | 予想の平均 | 実際の3着内率");
+for (const c of calib) {
+  if (c.n) console.log([`${c.lo * 100}〜${Math.min(c.hi, 1) * 100}%`, c.n, `${((100 * c.pred) / c.n).toFixed(0)}%`, `${((100 * c.hit) / c.n).toFixed(0)}%`].join(" | "));
+}
+
+if (process.argv[4]) {
+  fs.writeFileSync(process.argv[4], JSON.stringify({ races: raceOut, groups, calib }));
 }
