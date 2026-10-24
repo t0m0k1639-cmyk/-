@@ -26,7 +26,7 @@ def main() -> None:
     p.add_argument("--date", required=True)
     day = date.fromisoformat(p.parse_args().date)
     cfg = load_config()
-    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 20)
+    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 24)
 
     _, _, _, top = jra.is_race_day(f, day)
     days = jra._day_actions(top, "accessD.html", day)
@@ -38,6 +38,22 @@ def main() -> None:
     print("td.odds:", [masked(str(t), 400) for t in
                        parse.BeautifulSoup(page, "html.parser").select("td.odds")[:2]])
     print("オッズのリンク:", [r.odds_link for r in rows[:2]])
+
+    # 馬体重（発表済みの最初のレース）
+    html1 = jra._open(f, rows[0].race_link)
+    soup1 = parse.BeautifulSoup(html1, "html.parser")
+    for cls in ("h_weight", "weight", "body_weight"):
+        els = soup1.select(f"table .{cls}")[:3]
+        if els:
+            print(f"出馬表の .{cls}:", [masked(str(e), 300) for e in els])
+    for m in list(re.finditer(r"\d{3}\s*(?:kg)?\s*[(（]\s*[+\-－±]?\d{1,2}\s*[)）]", parse.page_text(html1)))[:3]:
+        print("馬体重らしき文字:", m.group(0))
+    tr = soup1.select("table tr")[1:2]
+    if tr:
+        print("1頭目の行:", masked(str(tr[0]), 1500))
+    if rows[0].odds_link:
+        oh = jra._open(f, rows[0].odds_link)
+        print("オッズページの h_weight:", [parse.norm(t.get_text(" ")) for t in parse.BeautifulSoup(oh, "html.parser").select("td.h_weight")][:5])
 
     # 前走欄の構造（3歳以上の条件戦の方が過去走が多い）
     target = next((r for r in rows if r.fields.get("race_class") in ("1勝クラス", "2勝クラス")), rows[0])
