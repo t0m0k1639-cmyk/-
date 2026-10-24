@@ -38,6 +38,9 @@ class Race:
     going: str | None = None        # 馬場状態
     post_time: str | None = None    # 発走時刻 "15:40"
     course_detail: str | None = None  # 出馬表のコース表記（例: 芝・右・外）
+    cushion: float | None = None    # 芝のクッション値（JRA発表の最新値）
+    moist: list[float] | None = None  # その馬場の含水率 [ゴール前, 4コーナー]（%）
+    baba_time: str | None = None    # 含水率・クッション値の測定時刻
     horses: list[Horse] = field(default_factory=list)
     # 単勝オッズ。スコア計算に使う（各馬の odds があればそこから作る）
     win_odds: list[float] = field(default_factory=list, repr=False)

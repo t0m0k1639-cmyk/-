@@ -114,7 +114,19 @@ def collect_going(f: Fetcher) -> dict[str, dict[str, str]]:
     return out
 
 
-def merge_going(races: list[Race], going: dict) -> None:
+def collect_baba_data(f: Fetcher) -> dict[str, dict]:
+    """含水率・クッション値の最新値（馬場情報ページが読み込むデータファイル。Shift_JIS）。"""
+    return parse.parse_baba_data(f.get("/keiba/baba/_data_cushion.html", encoding="cp932"),
+                                 f.get("/keiba/baba/_data_moist.html", encoding="cp932"))
+
+
+def merge_going(races: list[Race], going: dict, baba: dict | None = None) -> None:
     for r in races:
         g = going.get(r.venue, {})
         r.going = g.get("ダート" if r.surface == "ダート" else "芝")
+        b = (baba or {}).get(r.venue, {})
+        if r.surface == "ダート":
+            r.moist, r.baba_time = b.get("moist_dirt"), b.get("moist_time")
+        elif r.surface == "芝":
+            r.moist, r.cushion = b.get("moist_turf"), b.get("cushion")
+            r.baba_time = b.get("cushion_time") or b.get("moist_time")

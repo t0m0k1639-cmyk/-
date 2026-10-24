@@ -138,7 +138,12 @@ def cmd_run(args) -> int:
         except FetchError as e:
             log.warning("馬場情報の取得に失敗: %s", e)
             going = {}
-        jra.merge_going(races, going)
+        try:
+            baba = jra.collect_baba_data(f)
+        except FetchError as e:
+            log.warning("含水率・クッション値の取得に失敗: %s", e)
+            baba = {}
+        jra.merge_going(races, going, baba)
         warnings = validate(races)
     except (FetchError, ParseError) as e:
         log.error("%s", e)

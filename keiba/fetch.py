@@ -69,11 +69,14 @@ class Fetcher:
         if not self.robots.can_fetch(self.ua, BASE + path):
             raise FetchError(f"robots.txt で禁止されているため取得しません: {path}")
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, encoding: str | None = None) -> str:
+        """encoding を指定すると、ページ内の charset 表記がなくてもその文字コードで読む。"""
         self._allowed(path)
         r = self._request("GET", path)
         if not r.ok:
             raise FetchError(f"{path}: HTTP {r.status_code}")
+        if encoding:
+            return r.content.decode(encoding, errors="replace")
         return decode_html(r.content, r.encoding)
 
     def post_cname(self, path: str, cname: str) -> str:

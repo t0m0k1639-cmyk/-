@@ -325,6 +325,44 @@ def main_part(html: str) -> str:
     return str(soup)
 
 
+def _float(s: str) -> float | None:
+    m = re.search(r"\d+(?:\.\d+)?", s or "")
+    return float(m.group(0)) if m else None
+
+
+def parse_baba_data(cushion_html: str, moist_html: str) -> dict[str, dict]:
+    """馬場情報ページが読み込むデータファイルから、競馬場ごとの最新の測定値を取り出す。
+
+    構造（2026年10月に確認）: div#rcA・#rcB・#rcC（title が競馬場名）の中に div.unit が新しい順に並ぶ。
+      _data_cushion.html: .unit > .time「10月24日(土曜)7時00分」/ .cushion「9.5」
+      _data_moist.html:   .unit > .time / .turf > span.mg（ゴール前）・span.m4c（4コーナー）/ .dirt > 同
+    """
+    out: dict[str, dict] = {}
+
+    def blocks(html: str):
+        soup = BeautifulSoup(html, "html.parser")
+        for b in soup.find_all("div", id=re.compile(r"^rc[A-Z]$")):
+            venue = parse_venue(norm(b.get("title", "")))
+            unit = b.find("div", class_="unit", recursive=False)
+            if venue and unit:
+                yield venue, unit
+
+    for venue, u in blocks(cushion_html):
+        v = _float(_text(u.find(class_="cushion")))
+        if v is not None:
+            out.setdefault(venue, {}).update(cushion=v, cushion_time=_text(u.find(class_="time")))
+    for venue, u in blocks(moist_html):
+        d = out.setdefault(venue, {})
+        for key, cls in (("moist_turf", "turf"), ("moist_dirt", "dirt")):
+            box = u.find(class_=cls)
+            if box:
+                vals = [_float(_text(box.find(class_=c))) for c in ("mg", "m4c")]
+                if all(x is not None for x in vals):
+                    d[key] = vals
+        d["moist_time"] = _text(u.find(class_="time"))
+    return out
+
+
 def date_patterns(month: int, day: int) -> list[str]:
     return [f"{month}月{day}日", f"{month:02d}月{day:02d}日", f"{month}/{day}"]
 

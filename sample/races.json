@@ -263,7 +263,12 @@
      "breeder": "サンプル牧場6"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -1285,7 +1290,12 @@
      "breeder": "サンプル牧場6"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -1987,7 +1997,13 @@
      "breeder": "サンプル牧場15"
     }
    ],
-   "course_detail": "芝・左・外"
+   "course_detail": "芝・左・外",
+   "cushion": 9.5,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "東京",
@@ -2665,7 +2681,12 @@
      "breeder": "サンプル牧場8"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -3559,7 +3580,12 @@
      "breeder": "サンプル牧場2"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -4285,7 +4311,13 @@
      "breeder": "サンプル牧場6"
     }
    ],
-   "course_detail": "芝・左・外"
+   "course_detail": "芝・左・外",
+   "cushion": 9.5,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "東京",
@@ -4923,7 +4955,13 @@
      "breeder": "サンプル牧場11"
     }
    ],
-   "course_detail": "芝・左・外"
+   "course_detail": "芝・左・外",
+   "cushion": 9.5,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "東京",
@@ -5879,7 +5917,13 @@
      "breeder": "サンプル牧場3"
     }
    ],
-   "course_detail": "芝・左・外"
+   "course_detail": "芝・左・外",
+   "cushion": 9.5,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "東京",
@@ -7443,7 +7487,13 @@
      "breeder": "サンプル牧場15"
     }
    ],
-   "course_detail": "芝・左・外"
+   "course_detail": "芝・左・外",
+   "cushion": 9.5,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "東京",
@@ -8615,7 +8665,12 @@
      "breeder": "サンプル牧場7"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -9337,7 +9392,12 @@
      "breeder": "サンプル牧場2"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "東京",
@@ -10169,7 +10229,12 @@
      "breeder": "サンプル牧場10"
     }
    ],
-   "course_detail": "ダート・左"
+   "course_detail": "ダート・左",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "京都",
@@ -10527,7 +10592,13 @@
      "breeder": "サンプル牧場2"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -11227,7 +11298,13 @@
      "breeder": "サンプル牧場3"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -11971,7 +12048,13 @@
      "breeder": "サンプル牧場4"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -14033,7 +14116,13 @@
      "breeder": "サンプル牧場6"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -14861,7 +14950,13 @@
      "breeder": "サンプル牧場12"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -15625,7 +15720,12 @@
      "breeder": "サンプル牧場2"
     }
    ],
-   "course_detail": "ダート・右"
+   "course_detail": "ダート・右",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "京都",
@@ -16925,7 +17025,12 @@
      "breeder": "サンプル牧場9"
     }
    ],
-   "course_detail": "ダート・右"
+   "course_detail": "ダート・右",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "京都",
@@ -17389,7 +17494,12 @@
      "breeder": "サンプル牧場7"
     }
    ],
-   "course_detail": "ダート・右"
+   "course_detail": "ダート・右",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   },
   {
    "venue": "京都",
@@ -18111,7 +18221,13 @@
      "breeder": "サンプル牧場13"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -18921,7 +19037,13 @@
      "breeder": "サンプル牧場6"
     }
    ],
-   "course_detail": "芝・右・外"
+   "course_detail": "芝・右・外",
+   "cushion": 8.4,
+   "moist": [
+    12.7,
+    15.5
+   ],
+   "baba_time": "10月25日(日曜)7時00分"
   },
   {
    "venue": "京都",
@@ -19945,7 +20067,12 @@
      "breeder": "サンプル牧場7"
     }
    ],
-   "course_detail": "ダート・右"
+   "course_detail": "ダート・右",
+   "moist": [
+    2.0,
+    2.4
+   ],
+   "baba_time": "10月25日(日曜)5時00分"
   }
  ]
 }

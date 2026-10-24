@@ -266,7 +266,8 @@
       const baba = yosoOf(r).baba || {};
       const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), {
         manual: yosoOf(r).adj, pedigree: state.day.pedigree,
-        cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || "", moist: baba.moist || "" },
+        // クッション値は入力がなければJRA発表の最新値を使う。含水率は競馬場ごとに基準が違うので入力したときだけ使う
+        cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || (r.cushion != null ? String(r.cushion) : ""), moist: baba.moist || "" },
       });
       if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
       const warn = [];
@@ -387,9 +388,14 @@
     num.placeholder = isDirt ? "例 8.5" : "例 9.5";
     num.value = (isDirt ? babaNow().moist : babaNow().cushion) || "";
     num.addEventListener("change", () => saveBaba(isDirt ? { moist: num.value.trim() } : { cushion: num.value.trim() }));
-    babaBox.querySelector(".baba-hint").textContent = isDirt
-      ? "含水率を入れると、馬場状態よりそちらを優先して計算します（数字が大きいほど脚抜けが良く前が止まりにくい）。"
-      : "クッション値は10.5以上で硬め（上がりが出やすい）、8以下で軟らかめ（時計がかかり荒れやすい）として計算します。";
+    const jraBits = [];
+    if (r.cushion != null) jraBits.push(`クッション値 ${r.cushion}`);
+    if (r.moist) jraBits.push(`含水率 ゴール前${r.moist[0]}%・4コーナー${r.moist[1]}%`);
+    const jraLine = jraBits.length ? `JRA発表：${jraBits.join("／")}${r.baba_time ? `（${r.baba_time}）` : ""}` : "";
+    if (!isDirt && r.cushion != null) num.placeholder = `JRA ${r.cushion}`;
+    babaBox.querySelector(".baba-hint").textContent = [jraLine, isDirt
+      ? "含水率は競馬場ごとに基準が違うので、自動では計算に使いません。入れたときだけ、馬場状態より優先して計算します（数字が大きいほど脚抜けが良く前が止まりにくい）。"
+      : "クッション値は入れなければJRA発表の値で計算します。10.5以上で硬め（上がりが出やすい）、8以下で軟らかめ（時計がかかり荒れやすい）。"].filter(Boolean).join("　");
     if (r.surface === "障害") babaBox.hidden = true;
 
     const simBtn = node.querySelector(".sim-btn");

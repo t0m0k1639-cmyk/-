@@ -216,3 +216,24 @@ def test_pedigree_and_connections():
     assert (h.trainer, h.stable) == ("調教師 五郎", "栗東")
     assert (h.owner, h.breeder) == ("(有)テスト牧場", "テストファーム")
     assert h.past == []
+
+
+BABA_CUSHION = """<div id="cushion_data_list">
+<div id="rcA" title="東京"><div class="unit"><div class="time">10月24日(土曜)7時00分</div><div class="cushion">9.5</div></div>
+<div class="unit"><div class="time">10月23日(金曜)9時00分</div><div class="cushion">9.9</div></div></div>
+<div id="rcB" title="京都"><div class="unit"><div class="time">10月24日(土曜)6時00分</div><div class="cushion">9.5</div></div></div>
+</div>"""
+BABA_MOIST = """<div id="moist_data_list">
+<div id="rcA" title="東京"><div class="unit"><div class="time">10月24日(土曜)5時00分</div>
+<div class="turf"><span class="mg" data-condition="hard">12.7</span><span class="m4c">15.5</span></div>
+<div class="dirt"><span class="mg">2.0</span><span class="m4c">2.4</span></div></div>
+<div class="unit"><div class="time">10月23日(金曜)8時30分</div><div class="turf"><span class="mg">1.0</span><span class="m4c">1.0</span></div></div></div>
+</div>"""
+
+
+def test_baba_data_latest_per_venue():
+    d = parse.parse_baba_data(BABA_CUSHION, BABA_MOIST)
+    assert d["東京"]["cushion"] == 9.5 and d["京都"]["cushion"] == 9.5
+    assert d["東京"]["moist_turf"] == [12.7, 15.5] and d["東京"]["moist_dirt"] == [2.0, 2.4]
+    assert d["東京"]["cushion_time"] == "10月24日(土曜)7時00分"
+    assert "moist_turf" not in d["京都"]
