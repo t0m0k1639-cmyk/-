@@ -330,5 +330,6 @@
     };
   }
 
-  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS };
+  // _internal は成績の検証用（keiba/diag_sim.js）
+  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS, _internal: { features, buildModel, configFor, classBase, toSec } };
 })();

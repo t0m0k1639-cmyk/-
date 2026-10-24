@@ -256,8 +256,10 @@ def cmd_evaluate(args) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "day.json").write_text(json.dumps(saved, ensure_ascii=False))
         (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))
-        out = subprocess.run(["node", str(ROOT / "keiba" / "eval_sim.js"), f"{tmp}/day.json", f"{tmp}/res.json"],
-                             capture_output=True, text=True, check=True).stdout
+        out = "\n".join(
+            subprocess.run(["node", str(ROOT / "keiba" / js), f"{tmp}/day.json", f"{tmp}/res.json"],
+                           capture_output=True, text=True, check=True).stdout
+            for js in ("eval_sim.js", "diag_sim.js"))
     print(out)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
