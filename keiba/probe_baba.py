@@ -18,7 +18,7 @@ def around(text: str, word: str, before: int = 40, after: int = 260) -> list[str
 
 def main() -> None:
     cfg = load_config()
-    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 10)
+    f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 14)
     first = f.get("/keiba/baba/")
     names = sorted(set(re.findall(r'href="(?:/keiba/baba/)?(index\d+\.html)"', first)))
     for i, html in enumerate([first] + [f.get(f"/keiba/baba/{n}") for n in names]):
@@ -41,6 +41,17 @@ def main() -> None:
         for m in re.finditer(r"_\w*data\w*\s*=\s*[\[{]", html):
             print("\n=== 変数", re.sub(r"\s+", " ", html[m.start():m.start() + 700]))
     js = f.get("/keiba/baba/_js/baba2025.js")
+    lines = js.splitlines()
+    for i3, line in enumerate(lines):
+        if "_data_cushion" in line or "_data_moist" in line:
+            print("\n--- JS 周辺 ---")
+            print("\n".join(l.strip()[:200] for l in lines[max(0, i3 - 8):i3 + 12]))
+    for name in ("_data_cushion.html", "_data_moist.html"):
+        try:
+            d = f.get(f"/keiba/baba/{name}")
+            print(f"\n=== {name} ===", re.sub(r"\s+", " ", d)[:1500])
+        except Exception as e:
+            print(name, "取得できず:", e)
     m = re.search(r"_cushion_data\s*=", js)
     print("\nJS内の _cushion_data 定義:", re.sub(r"\s+", " ", js[m.start():m.start() + 400]) if m else "なし")
     print("\n=== baba2025.js（cushion・url・ajax を含む行）===")
