@@ -687,7 +687,8 @@
   const biasOf = (r) => ((state.day && state.day.bias) || {})[`${r.venue}|${r.surface}`] || null;
 
   // ---- 予想と結果（レース後の比較）
-  const reviewOf = (r) => (state.day.review ? state.day.review.races.find((x) => x.key === r.key) : null);
+  // 比較結果のレースは「東京-1」、ページのレースは「東京-01」の形なので、競馬場と番号で突き合わせる
+  const reviewOf = (r) => (state.day.review ? state.day.review.races.find((x) => x.key === `${r.venue}-${r.number}`) : null);
   const circled = (n) => (n >= 1 && n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `(${n})`);
   function placeOf(rv, num) {
     const x = rv && rv.result.find((y) => y.number === num);
@@ -703,7 +704,7 @@
     // 自分の印（この端末に保存したもの）
     let myN = 0, myWin = 0, myTop3 = 0, markN = 0, markTop3 = 0;
     for (const r of day.races) {
-      const x = rv.races.find((y) => y.key === r.key);
+      const x = reviewOf(r);
       if (!x) continue;
       const m = yosoOf(r).m;
       const hon = Object.keys(m).find((n) => m[n] === "◎");
