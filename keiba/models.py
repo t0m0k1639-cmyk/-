@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 
 
 @dataclass
@@ -22,6 +22,8 @@ class Horse:
     stable: str | None = None       # 所属（美浦・栗東）
     owner: str | None = None        # 馬主
     breeder: str | None = None      # 生産者
+    body_weight: int | None = None  # 馬体重（kg・当日発表）
+    body_weight_diff: int | None = None  # 前走からの増減（kg）
 
 
 @dataclass
@@ -51,9 +53,15 @@ class Race:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Race":
-        d = dict(d)
-        d["horses"] = [Horse(**h) for h in d.get("horses", [])]
-        return cls(**d)
+        """保存したページ用の辞書（スコアなど余分な項目を含む）からも戻せるようにする。"""
+        names = {f.name for f in fields(cls)}
+        hnames = {f.name for f in fields(Horse)}
+        d = {k: v for k, v in d.items() if k in names}
+        d["horses"] = [Horse(**{k: v for k, v in h.items() if k in hnames}) for h in d.get("horses", [])]
+        r = cls(**d)
+        if not r.win_odds:
+            r.win_odds = [h.odds for h in r.horses if h.odds and not h.scratched]
+        return r
 
 
 @dataclass

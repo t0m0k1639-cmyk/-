@@ -237,3 +237,19 @@ def test_baba_data_latest_per_venue():
     assert d["東京"]["moist_turf"] == [12.7, 15.5] and d["東京"]["moist_dirt"] == [2.0, 2.4]
     assert d["東京"]["cushion_time"] == "10月24日(土曜)7時00分"
     assert "moist_turf" not in d["京都"]
+
+
+def test_body_weight():
+    base = """<table><tr><th>馬名</th></tr><tr><td class="num">{n}</td><td class="horse">
+    <div class="name_line"><div class="name">テスト{n}</div></div>
+    <div class="result_line">{w}</div></td><td class="jockey"><p>牡3</p><p>57.0kg</p></td>
+    <td class="past p1"><div class="date">2026年10月1日</div><p class="h_weight">500<span>kg</span></p></td></tr></table>"""
+    [a] = parse.parse_horses(base.format(n=1, w='<div class="cell weight">442kg<span class="transition">(+8)</span></div>'))
+    assert (a.body_weight, a.body_weight_diff) == (442, 8)
+    [b] = parse.parse_horses(base.format(n=2, w='<div class="cell weight">506kg<span class="transition">(-12)</span></div>'))
+    assert (b.body_weight, b.body_weight_diff) == (506, -12)
+    [c] = parse.parse_horses(base.format(n=3, w='<div class="cell weight">444kg<span class="transition">(0)</span></div>'))
+    assert c.body_weight_diff == 0
+    # 発表前（戦績だけ）は読まない。前走欄の馬体重とも取り違えない
+    [d] = parse.parse_horses(base.format(n=4, w='<div class="cell result">(0.0.0.2)</div>'))
+    assert d.body_weight is None and d.body_weight_diff is None

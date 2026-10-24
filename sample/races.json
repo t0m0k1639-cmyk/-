@@ -32,7 +32,9 @@
      "dam_sire": "サンプル母父12",
      "stable": "栗東",
      "owner": "サンプル馬主5",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 450,
+     "body_weight_diff": -4
     },
     {
      "number": 2,
@@ -51,7 +53,9 @@
      "dam_sire": "サンプル母父1",
      "stable": "栗東",
      "owner": "サンプル馬主17",
-     "breeder": "サンプル牧場8"
+     "breeder": "サンプル牧場8",
+     "body_weight": 467,
+     "body_weight_diff": 4
     },
     {
      "number": 3,
@@ -70,7 +74,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "栗東",
      "owner": "サンプル馬主18",
-     "breeder": "サンプル牧場15"
+     "breeder": "サンプル牧場15",
+     "body_weight": 500,
+     "body_weight_diff": 2
     },
     {
      "number": 4,
@@ -89,7 +95,9 @@
      "dam_sire": "サンプル母父2",
      "stable": "栗東",
      "owner": "サンプル馬主6",
-     "breeder": "サンプル牧場12"
+     "breeder": "サンプル牧場12",
+     "body_weight": 497,
+     "body_weight_diff": 0
     },
     {
      "number": 5,
@@ -108,7 +116,9 @@
      "dam_sire": "サンプル母父14",
      "stable": "美浦",
      "owner": "サンプル馬主6",
-     "breeder": "サンプル牧場4"
+     "breeder": "サンプル牧場4",
+     "body_weight": 480,
+     "body_weight_diff": -12
     },
     {
      "number": 6,
@@ -127,7 +137,9 @@
      "dam_sire": "サンプル母父5",
      "stable": "美浦",
      "owner": "サンプル馬主13",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 490,
+     "body_weight_diff": 6
     },
     {
      "number": 7,
@@ -146,7 +158,9 @@
      "dam_sire": "サンプル母父30",
      "stable": "栗東",
      "owner": "サンプル馬主7",
-     "breeder": "サンプル牧場11"
+     "breeder": "サンプル牧場11",
+     "body_weight": 444,
+     "body_weight_diff": 4
     },
     {
      "number": 8,
@@ -165,7 +179,9 @@
      "dam_sire": "サンプル母父26",
      "stable": "栗東",
      "owner": "サンプル馬主3",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 489,
+     "body_weight_diff": 4
     },
     {
      "number": 9,
@@ -184,7 +200,9 @@
      "dam_sire": "サンプル母父13",
      "stable": "栗東",
      "owner": "サンプル馬主11",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 470,
+     "body_weight_diff": -4
     },
     {
      "number": 10,
@@ -203,7 +221,9 @@
      "dam_sire": "サンプル母父23",
      "stable": "美浦",
      "owner": "サンプル馬主14",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 449,
+     "body_weight_diff": -4
     },
     {
      "number": 11,
@@ -222,7 +242,9 @@
      "dam_sire": "サンプル母父28",
      "stable": "栗東",
      "owner": "サンプル馬主5",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 486,
+     "body_weight_diff": -18
     },
     {
      "number": 12,
@@ -241,7 +263,9 @@
      "dam_sire": "サンプル母父24",
      "stable": "美浦",
      "owner": "サンプル馬主20",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 514,
+     "body_weight_diff": 0
     },
     {
      "number": 13,
@@ -367,7 +391,9 @@
      "dam_sire": "サンプル母父5",
      "stable": "美浦",
      "owner": "サンプル馬主17",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 505,
+     "body_weight_diff": 2
     },
     {
      "number": 2,
@@ -431,7 +457,9 @@
      "dam_sire": "サンプル母父18",
      "stable": "美浦",
      "owner": "サンプル馬主14",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 440,
+     "body_weight_diff": 0
     },
     {
      "number": 3,
@@ -539,7 +567,9 @@
      "dam_sire": "サンプル母父21",
      "stable": "美浦",
      "owner": "サンプル馬主19",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 458,
+     "body_weight_diff": 0
     },
     {
      "number": 4,
@@ -581,7 +611,9 @@
      "dam_sire": "サンプル母父24",
      "stable": "美浦",
      "owner": "サンプル馬主2",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 454,
+     "body_weight_diff": 4
     },
     {
      "number": 5,
@@ -645,7 +677,9 @@
      "dam_sire": "サンプル母父20",
      "stable": "美浦",
      "owner": "サンプル馬主9",
-     "breeder": "サンプル牧場12"
+     "breeder": "サンプル牧場12",
+     "body_weight": 496,
+     "body_weight_diff": -18
     },
     {
      "number": 6,
@@ -731,7 +765,9 @@
      "dam_sire": "サンプル母父4",
      "stable": "栗東",
      "owner": "サンプル馬主8",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 511,
+     "body_weight_diff": -18
     },
     {
      "number": 7,
@@ -795,7 +831,9 @@
      "dam_sire": "サンプル母父2",
      "stable": "栗東",
      "owner": "サンプル馬主17",
-     "breeder": "サンプル牧場10"
+     "breeder": "サンプル牧場10",
+     "body_weight": 470,
+     "body_weight_diff": 4
     },
     {
      "number": 8,
@@ -837,7 +875,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "栗東",
      "owner": "サンプル馬主4",
-     "breeder": "サンプル牧場14"
+     "breeder": "サンプル牧場14",
+     "body_weight": 437,
+     "body_weight_diff": 16
     },
     {
      "number": 9,
@@ -923,7 +963,9 @@
      "dam_sire": "サンプル母父12",
      "stable": "栗東",
      "owner": "サンプル馬主7",
-     "breeder": "サンプル牧場7"
+     "breeder": "サンプル牧場7",
+     "body_weight": 432,
+     "body_weight_diff": 0
     },
     {
      "number": 10,
@@ -1031,7 +1073,9 @@
      "dam_sire": "サンプル母父24",
      "stable": "美浦",
      "owner": "サンプル馬主13",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 437,
+     "body_weight_diff": 4
     },
     {
      "number": 11,
@@ -1139,7 +1183,9 @@
      "dam_sire": "サンプル母父1",
      "stable": "栗東",
      "owner": "サンプル馬主4",
-     "breeder": "サンプル牧場4"
+     "breeder": "サンプル牧場4",
+     "body_weight": 447,
+     "body_weight_diff": -12
     },
     {
      "number": 12,
@@ -1203,7 +1249,9 @@
      "dam_sire": "サンプル母父9",
      "stable": "栗東",
      "owner": "サンプル馬主3",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 506,
+     "body_weight_diff": -18
     },
     {
      "number": 13,
@@ -1245,7 +1293,9 @@
      "dam_sire": "サンプル母父4",
      "stable": "美浦",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場7"
+     "breeder": "サンプル牧場7",
+     "body_weight": 519,
+     "body_weight_diff": -12
     },
     {
      "number": 14,
@@ -1372,7 +1422,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "美浦",
      "owner": "サンプル馬主14",
-     "breeder": "サンプル牧場11"
+     "breeder": "サンプル牧場11",
+     "body_weight": 473,
+     "body_weight_diff": -18
     },
     {
      "number": 2,
@@ -1414,7 +1466,9 @@
      "dam_sire": "サンプル母父25",
      "stable": "栗東",
      "owner": "サンプル馬主17",
-     "breeder": "サンプル牧場6"
+     "breeder": "サンプル牧場6",
+     "body_weight": 493,
+     "body_weight_diff": 16
     },
     {
      "number": 3,
@@ -1478,7 +1532,9 @@
      "dam_sire": "サンプル母父12",
      "stable": "美浦",
      "owner": "サンプル馬主10",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 488,
+     "body_weight_diff": -18
     },
     {
      "number": 4,
@@ -1542,7 +1598,9 @@
      "dam_sire": "サンプル母父1",
      "stable": "美浦",
      "owner": "サンプル馬主6",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 494,
+     "body_weight_diff": 6
     },
     {
      "number": 5,
@@ -1628,7 +1686,9 @@
      "dam_sire": "サンプル母父20",
      "stable": "美浦",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 463,
+     "body_weight_diff": 0
     },
     {
      "number": 6,
@@ -1714,7 +1774,9 @@
      "dam_sire": "サンプル母父7",
      "stable": "栗東",
      "owner": "サンプル馬主10",
-     "breeder": "サンプル牧場10"
+     "breeder": "サンプル牧場10",
+     "body_weight": 455,
+     "body_weight_diff": -4
     },
     {
      "number": 7,
@@ -1800,7 +1862,9 @@
      "dam_sire": "サンプル母父10",
      "stable": "美浦",
      "owner": "サンプル馬主16",
-     "breeder": "サンプル牧場9"
+     "breeder": "サンプル牧場9",
+     "body_weight": 509,
+     "body_weight_diff": 16
     },
     {
      "number": 8,
@@ -1886,7 +1950,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "栗東",
      "owner": "サンプル馬主4",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 489,
+     "body_weight_diff": 2
     },
     {
      "number": 9,
@@ -1994,7 +2060,9 @@
      "dam_sire": "サンプル母父5",
      "stable": "栗東",
      "owner": "サンプル馬主19",
-     "breeder": "サンプル牧場15"
+     "breeder": "サンプル牧場15",
+     "body_weight": 511,
+     "body_weight_diff": 6
     }
    ],
    "course_detail": "芝・左・外",
@@ -2080,7 +2148,9 @@
      "dam_sire": "サンプル母父22",
      "stable": "栗東",
      "owner": "サンプル馬主20",
-     "breeder": "サンプル牧場15"
+     "breeder": "サンプル牧場15",
+     "body_weight": 501,
+     "body_weight_diff": -12
     },
     {
      "number": 2,
@@ -2166,7 +2236,9 @@
      "dam_sire": "サンプル母父12",
      "stable": "美浦",
      "owner": "サンプル馬主2",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 456,
+     "body_weight_diff": 2
     },
     {
      "number": 3,
@@ -2230,7 +2302,9 @@
      "dam_sire": "サンプル母父6",
      "stable": "美浦",
      "owner": "サンプル馬主6",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 428,
+     "body_weight_diff": 4
     },
     {
      "number": 4,
@@ -2338,7 +2412,9 @@
      "dam_sire": "サンプル母父28",
      "stable": "美浦",
      "owner": "サンプル馬主7",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 501,
+     "body_weight_diff": 4
     },
     {
      "number": 5,
@@ -2380,7 +2456,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "栗東",
      "owner": "サンプル馬主3",
-     "breeder": "サンプル牧場3"
+     "breeder": "サンプル牧場3",
+     "body_weight": 431,
+     "body_weight_diff": 16
     },
     {
      "number": 6,
@@ -2422,7 +2500,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "栗東",
      "owner": "サンプル馬主18",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 428,
+     "body_weight_diff": -18
     },
     {
      "number": 7,
@@ -2530,7 +2610,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "栗東",
      "owner": "サンプル馬主18",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 439,
+     "body_weight_diff": 0
     },
     {
      "number": 8,
@@ -2572,7 +2654,9 @@
      "dam_sire": "サンプル母父18",
      "stable": "美浦",
      "owner": "サンプル馬主19",
-     "breeder": "サンプル牧場9"
+     "breeder": "サンプル牧場9",
+     "body_weight": 457,
+     "body_weight_diff": -18
     },
     {
      "number": 9,
@@ -2614,7 +2698,9 @@
      "dam_sire": "サンプル母父24",
      "stable": "美浦",
      "owner": "サンプル馬主5",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 518,
+     "body_weight_diff": -18
     },
     {
      "number": 10,
@@ -2678,7 +2764,9 @@
      "dam_sire": "サンプル母父16",
      "stable": "栗東",
      "owner": "サンプル馬主2",
-     "breeder": "サンプル牧場8"
+     "breeder": "サンプル牧場8",
+     "body_weight": 435,
+     "body_weight_diff": 0
     }
    ],
    "course_detail": "ダート・左",
@@ -2785,7 +2873,9 @@
      "dam_sire": "サンプル母父24",
      "stable": "美浦",
      "owner": "サンプル馬主20",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 497,
+     "body_weight_diff": 0
     },
     {
      "number": 2,
@@ -2871,7 +2961,9 @@
      "dam_sire": "サンプル母父29",
      "stable": "栗東",
      "owner": "サンプル馬主8",
-     "breeder": "サンプル牧場6"
+     "breeder": "サンプル牧場6",
+     "body_weight": 468,
+     "body_weight_diff": 16
     },
     {
      "number": 3,
@@ -2913,7 +3005,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "栗東",
      "owner": "サンプル馬主8",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 490,
+     "body_weight_diff": -12
     },
     {
      "number": 4,
@@ -2999,7 +3093,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "美浦",
      "owner": "サンプル馬主14",
-     "breeder": "サンプル牧場7"
+     "breeder": "サンプル牧場7",
+     "body_weight": 484,
+     "body_weight_diff": 6
     },
     {
      "number": 5,
@@ -3063,7 +3159,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "美浦",
      "owner": "サンプル馬主2",
-     "breeder": "サンプル牧場10"
+     "breeder": "サンプル牧場10",
+     "body_weight": 424,
+     "body_weight_diff": -12
     },
     {
      "number": 6,
@@ -3127,7 +3225,9 @@
      "dam_sire": "サンプル母父3",
      "stable": "美浦",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場6"
+     "breeder": "サンプル牧場6",
+     "body_weight": 420,
+     "body_weight_diff": 2
     },
     {
      "number": 7,
@@ -3191,7 +3291,9 @@
      "dam_sire": "サンプル母父18",
      "stable": "栗東",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場12"
+     "breeder": "サンプル牧場12",
+     "body_weight": 433,
+     "body_weight_diff": 0
     },
     {
      "number": 8,
@@ -3233,7 +3335,9 @@
      "dam_sire": "サンプル母父11",
      "stable": "美浦",
      "owner": "サンプル馬主11",
-     "breeder": "サンプル牧場1"
+     "breeder": "サンプル牧場1",
+     "body_weight": 445,
+     "body_weight_diff": -18
     },
     {
      "number": 9,
@@ -3319,7 +3423,9 @@
      "dam_sire": "サンプル母父19",
      "stable": "美浦",
      "owner": "サンプル馬主13",
-     "breeder": "サンプル牧場8"
+     "breeder": "サンプル牧場8",
+     "body_weight": 457,
+     "body_weight_diff": -12
     },
     {
      "number": 10,
@@ -3427,7 +3533,9 @@
      "dam_sire": "サンプル母父4",
      "stable": "栗東",
      "owner": "サンプル馬主8",
-     "breeder": "サンプル牧場8"
+     "breeder": "サンプル牧場8",
+     "body_weight": 439,
+     "body_weight_diff": 0
     },
     {
      "number": 11,
@@ -3513,7 +3621,9 @@
      "dam_sire": "サンプル母父7",
      "stable": "美浦",
      "owner": "サンプル馬主4",
-     "breeder": "サンプル牧場2"
+     "breeder": "サンプル牧場2",
+     "body_weight": 463,
+     "body_weight_diff": 16
     },
     {
      "number": 12,
@@ -3684,7 +3794,9 @@
      "dam_sire": "サンプル母父15",
      "stable": "美浦",
      "owner": "サンプル馬主12",
-     "breeder": "サンプル牧場14"
+     "breeder": "サンプル牧場14",
+     "body_weight": 466,
+     "body_weight_diff": -4
     },
     {
      "number": 2,
@@ -3792,7 +3904,9 @@
      "dam_sire": "サンプル母父8",
      "stable": "美浦",
      "owner": "サンプル馬主9",
-     "breeder": "サンプル牧場13"
+     "breeder": "サンプル牧場13",
+     "body_weight": 468,
+     "body_weight_diff": -18
     },
     {
      "number": 3,
@@ -3878,7 +3992,9 @@
      "dam_sire": "サンプル母父7",
      "stable": "美浦",
      "owner": "サンプル馬主15",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 478,
+     "body_weight_diff": -18
     },
     {
      "number": 4,
@@ -3986,7 +4102,9 @@
      "dam_sire": "サンプル母父4",
      "stable": "栗東",
      "owner": "サンプル馬主2",
-     "breeder": "サンプル牧場15"
+     "breeder": "サンプル牧場15",
+     "body_weight": 502,
+     "body_weight_diff": 2
     },
     {
      "number": 5,
@@ -4050,7 +4168,9 @@
      "dam_sire": "サンプル母父28",
      "stable": "栗東",
      "owner": "サンプル馬主20",
-     "breeder": "サンプル牧場14"
+     "breeder": "サンプル牧場14",
+     "body_weight": 499,
+     "body_weight_diff": -12
     },
     {
      "number": 6,
@@ -4136,7 +4256,9 @@
      "dam_sire": "サンプル母父2",
      "stable": "栗東",
      "owner": "サンプル馬主5",
-     "breeder": "サンプル牧場5"
+     "breeder": "サンプル牧場5",
+     "body_weight": 475,
+     "body_weight_diff": 6
     },
     {
      "number": 7,
@@ -4200,7 +4322,9 @@
      "dam_sire": "サンプル母父12",
      "stable": "栗東",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場15"
+     "breeder": "サンプル牧場15",
+     "body_weight": 458,
+     "body_weight_diff": -18
     },
     {
      "number": 8,
@@ -4308,7 +4432,9 @@
      "dam_sire": "サンプル母父28",
      "stable": "美浦",
      "owner": "サンプル馬主1",
-     "breeder": "サンプル牧場6"
+     "breeder": "サンプル牧場6",
+     "body_weight": 453,
+     "body_weight_diff": -12
     }
    ],
    "course_detail": "芝・左・外",

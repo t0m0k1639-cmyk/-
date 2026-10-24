@@ -209,6 +209,16 @@
       notes.push(`${surf === "芝" ? "初芝" : "初ダート"}：血統は${pf.apt > 0 ? "向く" : "向かない"}（${(pf.sire || pf.ds).label}）`);
     }
     const style = pos === null ? 1 : pos < 0.15 ? 0 : pos < 0.4 ? 1 : pos < 0.7 ? 2 : 3;
+    // 馬体重の増減（元のシミュレーターと同じ：大きく減った馬と、休み明け以外で大きく増えた馬だけ減点）
+    let bwAdj = 0;
+    const bw = h.body_weight_diff;
+    if (bw != null) {
+      const rested = notes.some((n) => n.startsWith("休み明け"));
+      if (bw <= -16) bwAdj = -3;
+      else if (bw <= -10) bwAdj = -1.5;
+      else if (bw >= 14 && !rested) bwAdj = -1.5;
+      if (bwAdj) notes.unshift(`馬体重${bw > 0 ? "+" : ""}${bw}kgで減点`);
+    }
     if (ab !== null && notes.some((n) => n.startsWith("休み明け"))) ab -= 1.5;
     const wetN = wW, wetDiff = (wW && gW) ? wS / wW - gS / gW : null;
     if (wW) notes.push(`道悪経験あり${wetDiff === null ? "" : (wetDiff >= 0 ? "（良より好走）" : "（良より低調）")}`);
@@ -220,7 +230,7 @@
     return {
       num: h.number, name: h.name, waku: h.waku, cr: ab, ten: pos === null ? null : -pos, ag,
       style, notes, pos, wetDiff, wetN, kinDiff, kin: Number.isFinite(h.weight) ? h.weight : null, jkRank: jockeyRank(h.jockey),
-      aptAdj, byPedigree,
+      aptAdj, byPedigree, bwAdj,
     };
   }
 
@@ -243,7 +253,7 @@
     const perKg = 0.9 * clamp(c.dist / 1600, 0.75, 1.4); // 1kg≒0.15秒（1600m基準・距離が長いほど大きく）
     const extra = hs.map((h) => {
       const kinTerm = (kinMean != null && Number.isFinite(h.kin)) ? -perKg * (h.kin - kinMean) : -0.9 * (h.kinDiff || 0);
-      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0);
+      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (h.bwAdj || 0);
       if (ge.lvl && h.wetDiff != null) p += ge.lvl * clamp(h.wetDiff, -6, 6) * 0.6 * (h.wetN / (h.wetN + 1.5));
       return p / 5;
     });

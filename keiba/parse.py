@@ -275,6 +275,14 @@ def parse_horses(html: str):
         trainer = _text(trainer_el.find("a") or trainer_el).split("(")[0].strip() or None if trainer_el else None
         row_text = _text(tr.find("td", class_="num")) + _text(horse_td.find(class_="name_line")) + jtext
         past = [p for p in (parse_past(td) for td in tr.select("td.past")) if p]
+        # 馬体重: 発表後は td.horse > .result_line > .cell.weight に「442kg(+8)」（初出走は「(初出走)」など）
+        bw = bw_diff = None
+        wt = _text(horse_td.select_one(".result_line .weight"))
+        m = re.search(r"(\d{3})\s*kg", wt)
+        if m:
+            bw = int(m.group(1))
+            m2 = re.search(r"[(（]\s*([+\-－]?\d{1,2})\s*[)）]", wt)
+            bw_diff = int(m2.group(1).replace("－", "-")) if m2 else None
         # 血統: li.sire「父：◯◯」/ li.mare「母：◯◯」+ span.bloodmare「(母の父：◯◯)」
         sire = re.sub(r"^父\s*[:：]\s*", "", _text(horse_td.find(class_="sire"))) or None
         mare = horse_td.find(class_="mare")
@@ -293,6 +301,7 @@ def parse_horses(html: str):
             jockey=jockey, trainer=trainer, odds=odds, popularity=pop,
             scratched=bool(SCRATCH_RE.search(row_text)), past=past,
             sire=sire, dam=dam, dam_sire=dam_sire, stable=division,
+            body_weight=bw, body_weight_diff=bw_diff,
             owner=_text(horse_td.find(class_="owner")) or None,
             breeder=_text(horse_td.find(class_="breeder")) or None,
         ))

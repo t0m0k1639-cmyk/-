@@ -167,6 +167,11 @@
     main.append(nameBtn);
     const sub = [h.sex_age, h.weight != null ? `${h.weight.toFixed(1)}kg` : null, h.jockey].filter(Boolean).join("・");
     main.append(el("span", "h-sub", h.scratched ? `取消・${sub}` : sub));
+    if (h.body_weight) {
+      const d = h.body_weight_diff;
+      const big = d != null && (d <= -10 || d >= 14);
+      main.append(el("span", `bw${big ? " bw-big" : ""}`, `馬体重 ${h.body_weight}kg${d != null ? `（${d > 0 ? "+" : ""}${d}）` : ""}`));
+    }
     const pb = pedBadge(h.sire);
     if (pb) main.append(el("span", `ped-badge ${pb === "芝向き" ? "turf" : "dirt"}`, `父:${pb}`));
     const adjNow = yosoOf(r).adj[h.number] || 0;
@@ -233,6 +238,80 @@
   }
 
   function pct(x) { return (x * 100).toFixed(1) + "%"; }
+
+  // ---- 「このレースを最新にする」：GitHub の取得処理（refresh.yml）を呼び出し、終わったら読み直す
+  const GH = (() => {
+    const owner = location.hostname.endsWith(".github.io") ? location.hostname.split(".")[0] : null;
+    const repo = location.pathname.split("/").filter(Boolean)[0] || null;
+    return { owner, repo, api: owner && repo ? `https://api.github.com/repos/${owner}/${repo}` : null };
+  })();
+  const token = () => store.get("ghToken");
+  async function gh(path, opts = {}) {
+    const r = await fetch(GH.api + path, Object.assign({}, opts, {
+      headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token()}`, "X-GitHub-Api-Version": "2022-11-28" },
+    }));
+    if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("合鍵が違うか、権限が足りません（設定を確認してください）");
+    if (!r.ok) throw new Error(`GitHub ${r.status}`);
+    return r.status === 204 ? null : r.json();
+  }
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  async function refreshRace(r, msg, btn) {
+    if (!GH.api) { msg.textContent = "公開ページ（github.io）でだけ使えます"; return; }
+    if (!token()) {
+      msg.textContent = "先にページ下の「更新ボタンの設定」で合鍵を保存してください";
+      $("token-box").open = true;
+      $("token-box").scrollIntoView({ block: "start" });
+      return;
+    }
+    btn.disabled = true;
+    const started = Date.now();
+    const tick = (t) => { msg.textContent = `${t}（${Math.round((Date.now() - started) / 1000)}秒）`; };
+    try {
+      const before = (await getJSON("data/status.json").catch(() => ({}))).checked_at || "";
+      tick("取得を依頼しています");
+      const { default_branch: ref } = await gh("");
+      await gh("/actions/workflows/refresh.yml/dispatches", {
+        method: "POST", body: JSON.stringify({ ref, inputs: { race: `${r.venue}-${r.number}`, date: state.day.date } }),
+      });
+      let run = null;
+      while (Date.now() - started < 5 * 60e3) {
+        await sleep(5000);
+        if (!run) {
+          const list = await gh("/actions/workflows/refresh.yml/runs?event=workflow_dispatch&per_page=5");
+          run = (list.workflow_runs || []).find((x) => Date.parse(x.created_at) >= started - 15e3) || null;
+          tick(run ? "JRAから取得しています" : "順番待ちです");
+          continue;
+        }
+        run = await gh(`/actions/runs/${run.id}`);
+        if (run.status !== "completed") { tick(run.status === "queued" ? "順番待ちです" : "JRAから取得して、ページを作り直しています"); continue; }
+        if (run.conclusion !== "success") throw new Error("取得処理が失敗しました");
+        // ページの公開が終わるのを待って読み直す
+        tick("ページの反映を待っています");
+        for (let i = 0; i < 24; i++) {
+          const st = await getJSON(`data/status.json?t=${Date.now()}`).catch(() => ({}));
+          if ((st.checked_at || "") > before) {
+            const day = await loadDay(state.day.date);
+            showDay(day);
+            const card = document.getElementById(`r-${r.key}`);
+            if (card) {
+              card.querySelector(".race-head").click();
+              card.querySelector(".refresh-msg").textContent = `最新にしました（${fmtTime(day.generated_at)}）`;
+              card.scrollIntoView({ block: "start" });
+            }
+            return;
+          }
+          await sleep(5000);
+        }
+        throw new Error("取得は終わりましたが、ページへの反映が遅れています。少し待って再読み込みしてください");
+      }
+      throw new Error("時間がかかりすぎています。少し待って再読み込みしてください");
+    } catch (e) {
+      msg.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
 
   // 即PATへのリンクと、印のコピー（即PATに買い目を自動で入れる仕組みはJRAにないため、見返す用）
   const IPAT_URL = "https://www.ipat.jra.go.jp/";
@@ -398,6 +477,9 @@
       : "クッション値は入れなければJRA発表の値で計算します。10.5以上で硬め（上がりが出やすい）、8以下で軟らかめ（時計がかかり荒れやすい）。"].filter(Boolean).join("　");
     if (r.surface === "障害") babaBox.hidden = true;
 
+    const refreshBtn = node.querySelector(".refresh-btn");
+    refreshBtn.addEventListener("click", () => refreshRace(r, node.querySelector(".refresh-msg"), refreshBtn));
+
     const simBtn = node.querySelector(".sim-btn");
     if (!horses.length || r.surface === "障害") simBtn.disabled = true;
     simBtn.addEventListener("click", () => renderSim(r, node.querySelector(".sim-out")));
@@ -517,6 +599,26 @@
       store.set("sort", state.sort);
       renderList();
     }));
+    $("token-save").addEventListener("click", async () => {
+      const v = $("gh-token").value.trim();
+      if (!v) { $("token-msg").textContent = "合鍵を貼り付けてから押してください"; return; }
+      store.set("ghToken", v);
+      $("gh-token").value = "";
+      $("token-msg").textContent = "確認しています…";
+      try {
+        if (!GH.api) throw new Error("公開ページ（github.io）でだけ確認できます");
+        await gh("/actions/workflows/refresh.yml");
+        $("token-msg").textContent = "保存しました。各レースの「このレースを最新にする」が使えます。";
+      } catch (e) {
+        $("token-msg").textContent = `保存しましたが、確認できませんでした：${e.message}`;
+      }
+    });
+    $("token-clear").addEventListener("click", () => {
+      store.del("ghToken");
+      $("token-msg").textContent = "合鍵を消しました";
+    });
+    $("token-msg").textContent = token() ? "合鍵は保存済みです" : "まだ合鍵が保存されていません";
+
     $("odds-toggle").addEventListener("click", () => {
       state.showOdds = !state.showOdds;
       store.set("showOdds", state.showOdds ? "1" : "0");

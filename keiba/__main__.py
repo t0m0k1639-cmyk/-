@@ -9,6 +9,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tomllib
@@ -17,7 +18,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import jra, pedigree
-from .crypto import encrypt
+from .crypto import decrypt, encrypt
 from .fetch import FetchError, Fetcher
 from .models import Race
 from .score import score_day
@@ -163,6 +164,49 @@ def cmd_run(args) -> int:
     return 0
 
 
+def cmd_refresh(args) -> int:
+    """1レースだけ取り直して、その日のデータを書き直す（ページの「このレースを最新にする」ボタン用）。"""
+    cfg = load_config()
+    day = date.fromisoformat(args.date) if args.date else datetime.now(JST).date()
+    data_dir = Path(args.data)
+    password = page_password()
+    m = re.fullmatch(r"(\S+?)-(\d{1,2})", args.race or "")
+    path = data_dir / "days" / f"{day.isoformat()}.json"
+    if not password or not m or not path.exists():
+        log.error("パスワード・レース指定（例 東京-10）・その日のデータのどれかがありません")
+        return 2
+    venue, number = m.group(1), int(m.group(2))
+    saved = decrypt(json.loads(path.read_text()), password)
+    races = [Race.from_dict(r) for r in saved["races"]]
+    try:
+        f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 30)
+        race_day, _, _, top_d = jra.is_race_day(f, day)
+        new = jra.collect_one(f, day, top_d, venue, number) if race_day else None
+        if new is None:
+            raise ParseError(f"{venue}{number}R を開催ページで見つけられませんでした")
+        try:
+            going, baba = jra.collect_going(f), jra.collect_baba_data(f)
+        except FetchError as e:
+            log.warning("馬場情報の取得に失敗: %s", e)
+            going, baba = {}, {}
+        jra.merge_going([new], going, baba)
+    except (FetchError, ParseError) as e:
+        log.error("%s", e)
+        write_status(data_dir, day, "error", f"{venue}{number}R の更新に失敗: {e}")
+        return 2
+    races = [new if (r.venue, r.number) == (venue, number) else r for r in races]
+    for r in races:   # 同じ競馬場の馬場は他のレースにも反映する
+        if r.venue == venue and new.going and r is not new and r.surface == new.surface:
+            r.going, r.cushion, r.moist, r.baba_time = new.going, new.cushion, new.moist, new.baba_time
+    write_day(data_dir, day, races, cfg, saved.get("warnings", []), password,
+              pedigree_stats=saved.get("pedigree", {}))
+    status = json.loads((data_dir / "status.json").read_text())
+    status["refreshed"] = f"{venue}-{number:02d}"
+    (data_dir / "status.json").write_text(json.dumps(status, ensure_ascii=False, indent=1))
+    log.info("%s%dR を更新しました（リクエスト %d 件）", venue, number, f.count)
+    return 0
+
+
 def cmd_sample(args) -> int:
     cfg = load_config()
     raw = json.loads((ROOT / "sample" / "races.json").read_text())
@@ -199,13 +243,18 @@ def main(argv=None) -> int:
     r = sub.add_parser("run")
     r.add_argument("--date")
     r.add_argument("--data", default=str(ROOT / "data"))
+    rf = sub.add_parser("refresh")
+    rf.add_argument("--race", required=True, help="例: 東京-10")
+    rf.add_argument("--date")
+    rf.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "sample": cmd_sample, "build-site": cmd_build_site}[args.cmd](args)
+    return {"run": cmd_run, "refresh": cmd_refresh, "sample": cmd_sample,
+            "build-site": cmd_build_site}[args.cmd](args)
 
 
 if __name__ == "__main__":

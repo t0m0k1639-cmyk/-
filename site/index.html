@@ -71,6 +71,18 @@
     </dl>
     <p>スコアの計算では、オッズはレースを選ぶためだけに使っています。印を考えるときにオッズを見たくなければ「オッズ表示」を押して隠せます。</p>
   </details>
+
+  <details class="howto" id="token-box">
+    <summary>更新ボタンの設定（GitHub の合鍵）</summary>
+    <p>「このレースを最新にする」ボタンは、GitHub のアクセストークン（この処理を動かす権限だけの合鍵）を使って、取得処理を呼び出します。合鍵はこの端末の中にだけ保存されます。</p>
+    <label class="sr" for="gh-token">GitHub のアクセストークン</label>
+    <input id="gh-token" class="token-input" type="password" autocomplete="off" placeholder="github_pat_ で始まる文字">
+    <div class="token-actions">
+      <button type="button" id="token-save">保存する</button>
+      <button type="button" id="token-clear">消す</button>
+    </div>
+    <p id="token-msg" class="token-msg" aria-live="polite"></p>
+  </details>
   </div>
 </main>
 
@@ -96,6 +108,10 @@
       </span>
     </button>
     <div class="race-detail" hidden>
+      <div class="refresh">
+        <button type="button" class="refresh-btn">このレースを最新にする（約1分）</button>
+        <span class="refresh-msg" aria-live="polite"></span>
+      </div>
       <p class="d-hint">左の印をタップすると ◎○▲△☆✕ の順に変わります。馬名をタップすると前走〜4走前が開きます。</p>
       <div class="horses-wrap">
         <table class="horses">

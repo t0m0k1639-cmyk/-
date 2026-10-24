@@ -1,0 +1,72 @@
+name: レースを最新にする
+
+# ページの「このレースを最新にする」ボタンから呼ばれる。1レースだけ取り直してページを更新する
+on:
+  workflow_dispatch:
+    inputs:
+      race:
+        description: "レース（例: 東京-10）"
+        required: true
+      date:
+        description: "対象日 YYYY-MM-DD（空なら今日）"
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# 朝の更新と同じグループにして、data/ の書き込みとページの公開が重ならないようにする
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 1レースだけ取り直す
+        env:
+          KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          TARGET_RACE: ${{ inputs.race }}
+          TARGET_DATE: ${{ inputs.date }}
+        run: python -m keiba refresh --race "$TARGET_RACE" ${TARGET_DATE:+--date "$TARGET_DATE"}
+
+      - name: data/ をコミット
+        if: always()
+        env:
+          TARGET_RACE: ${{ inputs.race }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: ${TARGET_RACE} を更新（$(TZ=Asia/Tokyo date '+%H:%M')）"
+          git pull --rebase -q
+          git push
+
+      - run: python -m keiba build-site --out _site
+        if: always()
+
+      - uses: actions/upload-pages-artifact@v3
+        if: always()
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4
+        id: deploy
+        if: always()

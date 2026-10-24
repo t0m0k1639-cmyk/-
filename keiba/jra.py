@@ -58,33 +58,55 @@ def _open(f: Fetcher, link: parse.Link) -> str:
     return f.get(u.path + (f"?{u.query}" if u.query else ""))
 
 
+def _build_race(f: Fetcher, venue: str, row: parse.DayRow) -> Race:
+    """開催ページの1行から、出馬表（出走馬・オッズ・馬体重）まで読んだレースを作る。"""
+    race = Race(venue=venue, **row.fields)
+    if row.race_link:
+        try:
+            html = _open(f, row.race_link)
+            race.handicap = race.handicap or parse.parse_weight_rule(html) == "ハンデ"
+            race.horses = parse.parse_horses(html)
+            race.course_detail = parse.parse_course_detail(html)
+        except Exception as e:  # 1レース分の失敗で全体を止めない
+            log.warning("%s%dR の出馬表を読めませんでした: %s", venue, race.number, e)
+    running = [h for h in race.horses if not h.scratched]
+    if running:
+        race.field_size = len(running)
+    # 当日は出馬表に単勝オッズが載る。載っていなければオッズのページを読む
+    race.win_odds = [h.odds for h in running if h.odds]
+    if not race.win_odds and row.odds_link:
+        try:
+            race.win_odds = _odds(f, row.odds_link)
+        except Exception as e:
+            log.warning("%s%dR のオッズを読めませんでした: %s", venue, race.number, e)
+    return race
+
+
+def _venue_days(f: Fetcher, today: date, top_d: str):
+    for day in _day_actions(top_d, "accessD.html", today):
+        venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
+        yield venue, day
+
+
 def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
     races: list[Race] = []
-    for day in _day_actions(top_d, "accessD.html", today):
+    for venue, day in _venue_days(f, today, top_d):
         page = f.post_cname(day.path, day.cname)
-        venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
         for row in parse.parse_day_rows(page):
-            race = Race(venue=venue, **row.fields)
-            if row.race_link:
-                try:
-                    html = _open(f, row.race_link)
-                    race.handicap = race.handicap or parse.parse_weight_rule(html) == "ハンデ"
-                    race.horses = parse.parse_horses(html)
-                    race.course_detail = parse.parse_course_detail(html)
-                except Exception as e:  # 1レース分の失敗で全体を止めない
-                    log.warning("%s%dR の出馬表を読めませんでした: %s", venue, race.number, e)
-            running = [h for h in race.horses if not h.scratched]
-            if running:
-                race.field_size = len(running)
-            # 当日は出馬表に単勝オッズが載る。載っていなければオッズのページを読む
-            race.win_odds = [h.odds for h in running if h.odds]
-            if not race.win_odds and row.odds_link:
-                try:
-                    race.win_odds = _odds(f, row.odds_link)
-                except Exception as e:
-                    log.warning("%s%dR のオッズを読めませんでした: %s", venue, race.number, e)
-            races.append(race)
+            races.append(_build_race(f, venue, row))
     return races
+
+
+def collect_one(f: Fetcher, today: date, top_d: str, venue: str, number: int) -> Race | None:
+    """1レースだけ取り直す（更新ボタン用）。"""
+    for v, day in _venue_days(f, today, top_d):
+        if v != venue:
+            continue
+        page = f.post_cname(day.path, day.cname)
+        for row in parse.parse_day_rows(page):
+            if row.fields.get("number") == number:
+                return _build_race(f, venue, row)
+    return None
 
 
 def _odds(f: Fetcher, link: parse.Link) -> list[float]:

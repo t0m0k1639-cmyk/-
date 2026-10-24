@@ -391,3 +391,27 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .bet-ipat { background: var(--ana); color: var(--surface); }
 .bet-copy { background: transparent; color: var(--ana); }
 .bet-msg { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* 更新ボタン */
+.refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.refresh-btn {
+  font: inherit; font-size: var(--step--1); font-weight: 700; border-radius: 999px; padding: 7px 14px;
+  border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); cursor: pointer;
+}
+.refresh-btn:disabled { opacity: 0.6; cursor: progress; }
+.refresh-msg { font-size: 0.75rem; color: var(--muted); }
+.token-input {
+  font: inherit; width: 100%; padding: 8px 10px; margin: 8px 0; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--fg);
+}
+.token-actions { display: flex; gap: 8px; }
+.token-actions button {
+  font: inherit; font-size: var(--step--1); font-weight: 700; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface);
+}
+.token-actions button + button { background: transparent; color: var(--accent); }
+.token-msg { margin-top: 6px; }
+
+/* 馬体重 */
+.bw { display: block; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bw-big { color: var(--err-fg); font-weight: 700; }

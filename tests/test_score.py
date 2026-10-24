@@ -88,3 +88,27 @@ def test_validate_rejects_unparsed_pages():
 def test_sample_file_loads():
     raw = json.loads((ROOT / "sample" / "races.json").read_text())
     assert len(score_day([Race.from_dict(r) for r in raw["races"]], CFG)) == len(raw["races"])
+
+
+def test_refresh_replaces_one_race(tmp_path, monkeypatch):
+    """更新ボタン用の処理: 指定したレースだけ差し替えて、ほかのレースは残す。"""
+    from datetime import date
+    from keiba import __main__ as m, jra
+    from keiba.crypto import decrypt
+    from keiba.models import Horse
+    day = date(2026, 10, 24)
+    old = [race(number=i, horses=[Horse(number=1, name=f"馬{i}", odds=3.0)]) for i in (1, 2)]
+    m.write_day(tmp_path, day, old, CFG, [], "pw", pedigree_stats={"父A": {}})
+    new = race(number=2, horses=[Horse(number=1, name="馬2", odds=9.9, body_weight=480, body_weight_diff=-12)])
+    monkeypatch.setenv("PAGE_PASSWORD", "pw")
+    monkeypatch.setattr(m, "Fetcher", lambda *a, **k: type("F", (), {"count": 3})())
+    monkeypatch.setattr(jra, "is_race_day", lambda f, d: (True, None, None, ""))
+    monkeypatch.setattr(jra, "collect_one", lambda f, d, t, v, n: new if (v, n) == ("東京", 2) else None)
+    monkeypatch.setattr(jra, "collect_going", lambda f: {})
+    monkeypatch.setattr(jra, "collect_baba_data", lambda f: {})
+    assert m.main(["refresh", "--race", "東京-2", "--date", "2026-10-24", "--data", str(tmp_path)]) == 0
+    saved = decrypt(json.loads((tmp_path / "latest.json").read_text()), "pw")
+    by = {r["number"]: r for r in saved["races"]}
+    assert by[2]["horses"][0]["body_weight_diff"] == -12 and by[2]["horses"][0]["odds"] == 9.9
+    assert by[1]["horses"][0]["odds"] == 3.0 and saved["pedigree"] == {"父A": {}}
+    assert json.loads((tmp_path / "status.json").read_text())["refreshed"] == "東京-02"
