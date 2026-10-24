@@ -19,7 +19,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import jra, pedigree
+from . import bias, jra, pedigree
 from .crypto import decrypt, encrypt
 from .fetch import FetchError, Fetcher
 from .models import Race
@@ -81,7 +81,7 @@ def page_password() -> str | None:
 
 def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
               warnings: list[str], password: str, sample: bool = False,
-              pedigree_stats: dict | None = None) -> None:
+              pedigree_stats: dict | None = None, bias_stats: dict | None = None) -> None:
     """出走馬・オッズを含むので、パスワードで暗号化して保存する。"""
     scored = score_day(races, cfg)
     payload = {
@@ -92,6 +92,7 @@ def write_day(data_dir: Path, day: date, races: list[Race], cfg: dict,
         "warnings": warnings,
         "races": [s.to_dict() for s in scored],
         "pedigree": pedigree_stats or {},
+        "bias": bias_stats or {},   # 開催中の馬場の傾向（keiba/bias.py）
     }
     (data_dir / "days").mkdir(parents=True, exist_ok=True)
     text = json.dumps(encrypt(payload, password))
@@ -162,52 +163,73 @@ def cmd_run(args) -> int:
     names = {n for r in races for h in r.horses for n in (h.sire, h.dam_sire) if n}
     log.info("血統の記録: %d 走を追加（合計 %d 走）", added, len(store.runs))
     write_day(data_dir, day, races, cfg, warnings, password,
-              pedigree_stats=pedigree.summarize(store.runs, names))
+              pedigree_stats=pedigree.summarize(store.runs, names),
+              bias_stats=bias.for_day(data_dir, day, password, [race_meta(r) for r in races]))
     log.info("%d レースを書き出しました（リクエスト %d 件）", len(races), f.count)
     set_output("updated", "true")
     return 0
 
 
+def race_meta(r: Race) -> dict:
+    return {"venue": r.venue, "number": r.number, "surface": r.surface, "post_time": r.post_time}
+
+
 def cmd_refresh(args) -> int:
-    """1レースだけ取り直して、その日のデータを書き直す（ページの「このレースを最新にする」ボタン用）。"""
+    """指定したレースだけ取り直して、その日のデータを書き直す（ページの更新ボタン用）。
+
+    --race は「東京-10」か、まとめて「東京-10,京都-10,新潟-10」。終わったレースの結果も取り込んで、馬場の傾向を更新する。
+    """
     cfg = load_config()
     day = date.fromisoformat(args.date) if args.date else datetime.now(JST).date()
     data_dir = Path(args.data)
     password = page_password()
-    m = re.fullmatch(r"(\S+?)-(\d{1,2})", args.race or "")
+    targets = [re.fullmatch(r"(\S+?)-(\d{1,2})", t.strip()) for t in (args.race or "").split(",") if t.strip()]
     path = data_dir / "days" / f"{day.isoformat()}.json"
-    if not password or not m or not path.exists():
-        log.error("パスワード・レース指定（例 東京-10）・その日のデータのどれかがありません")
+    if not password or not targets or not all(targets) or not path.exists():
+        log.error("パスワード・レース指定（例 東京-10、まとめては 東京-10,京都-10）・その日のデータのどれかがありません")
         return 2
-    venue, number = m.group(1), int(m.group(2))
+    wanted = {(m.group(1), int(m.group(2))) for m in targets}
+    label = ",".join(f"{v}{n}R" for v, n in sorted(wanted))
     saved = decrypt(json.loads(path.read_text()), password)
     races = [Race.from_dict(r) for r in saved["races"]]
     try:
-        f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 30)
+        f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], 30 + 6 * len(wanted))
         race_day, _, _, top_d = jra.is_race_day(f, day)
-        new = jra.collect_one(f, day, top_d, venue, number) if race_day else None
-        if new is None:
-            raise ParseError(f"{venue}{number}R を開催ページで見つけられませんでした")
+        news = jra.collect_some(f, day, top_d, wanted) if race_day else []
+        missing = wanted - {(r.venue, r.number) for r in news}
+        if missing:
+            raise ParseError("開催ページで見つけられませんでした: " + ",".join(f"{v}{n}R" for v, n in sorted(missing)))
         try:
             going, baba = jra.collect_going(f), jra.collect_baba_data(f)
         except FetchError as e:
             log.warning("馬場情報の取得に失敗: %s", e)
             going, baba = {}, {}
-        jra.merge_going([new], going, baba)
+        jra.merge_going(news, going, baba)
     except (FetchError, ParseError) as e:
         log.error("%s", e)
-        write_status(data_dir, day, "error", f"{venue}{number}R の更新に失敗: {e}")
+        write_status(data_dir, day, "error", f"{label} の更新に失敗: {e}")
         return 2
-    races = [new if (r.venue, r.number) == (venue, number) else r for r in races]
-    for r in races:   # 同じ競馬場の馬場は他のレースにも反映する
-        if r.venue == venue and new.going and r is not new and r.surface == new.surface:
-            r.going, r.cushion, r.moist, r.baba_time = new.going, new.cushion, new.moist, new.baba_time
+    by_key = {(r.venue, r.number): r for r in news}
+    races = [by_key.get((r.venue, r.number), r) for r in races]
+    for new in news:   # 同じ競馬場の馬場は他のレースにも反映する
+        for r in races:
+            if r.venue == new.venue and new.going and r.number not in {n.number for n in news if n.venue == r.venue} \
+                    and r.surface == new.surface:
+                r.going, r.cushion, r.moist, r.baba_time = new.going, new.cushion, new.moist, new.baba_time
+    # 終わったレースの結果（通過順）を取り込んで、馬場の傾向を出し直す。失敗しても更新は続ける
+    metas = [race_meta(r) for r in races]
+    try:
+        raw = bias.update_raw(f, data_dir, day, password, metas, datetime.now(JST))
+        bias_stats = bias.for_day(data_dir, day, password, metas, raw)
+    except (FetchError, ParseError) as e:
+        log.warning("馬場の傾向の更新に失敗: %s", e)
+        bias_stats = saved.get("bias", {})
     write_day(data_dir, day, races, cfg, saved.get("warnings", []), password,
-              pedigree_stats=saved.get("pedigree", {}))
+              pedigree_stats=saved.get("pedigree", {}), bias_stats=bias_stats)
     status = json.loads((data_dir / "status.json").read_text())
-    status["refreshed"] = f"{venue}-{number:02d}"
+    status["refreshed"] = ",".join(f"{v}-{n:02d}" for v, n in sorted(wanted))
     (data_dir / "status.json").write_text(json.dumps(status, ensure_ascii=False, indent=1))
-    log.info("%s%dR を更新しました（リクエスト %d 件）", venue, number, f.count)
+    log.info("%s を更新しました（リクエスト %d 件）", label, f.count)
     return 0
 
 
@@ -236,7 +258,7 @@ def cmd_build_site(args) -> int:
     data = Path(args.data)
     if data.exists():
         # 血統の記録（pedigree.json）は集計用でページでは使わないので置かない
-        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep", "pedigree.json"))
+        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep", "pedigree.json", bias.RAW_DIR))
     return 0
 
 
@@ -258,6 +280,19 @@ def cmd_evaluate(args) -> int:
     f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
     results = jra.collect_results(f, day)
     log.info("結果を取得: %d レース", len(results))
+    if results:
+        # 翌日の馬場の傾向に使う控え
+        bias.save_raw(data_dir, day, password, results)
+    # 検証では、各レースの発走前までにわかっていた傾向だけを使う（後のレースの結果を混ぜない）
+    prev = bias.previous_day(data_dir, day)
+    days = ([(bias.load_day_races(data_dir, prev, password), bias.load_raw(data_dir, prev, password))] if prev else []) \
+        + [(saved["races"], results)]
+    saved["bias_by_race"] = {}
+    for r in saved["races"]:
+        t = bias._minutes(r.get("post_time"))
+        if t is not None:
+            saved["bias_by_race"][f"{r['venue']}-{r['number']}"] = \
+                bias.compute(days, before=(day.isoformat(), t)).get(f"{r['venue']}|{r['surface']}")
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "day.json").write_text(json.dumps(saved, ensure_ascii=False))
         (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))

@@ -440,3 +440,14 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .sim-result-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .sim-result-item { font-size: 0.6875rem; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
 .sim-result-item.hit { background: var(--hon-soft); color: var(--hon); border-color: transparent; font-weight: 700; }
+.tag-bias { color: var(--muted); }
+.tag-bias.on { color: var(--ana); border-color: currentColor; font-weight: 700; }
+
+/* まとめて最新にする */
+.batch { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; display: grid; gap: 6px; }
+.batch-title { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.batch-btns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.batch-btns button { font: inherit; font-size: var(--step--1); font-weight: 700; border: 1px solid var(--accent); color: var(--accent); background: var(--surface); border-radius: 999px; padding: 7px 4px; cursor: pointer; }
+.batch-btns button:disabled { opacity: 0.5; cursor: default; }
+.batch-msg { font-size: var(--step--1); color: var(--muted); }
+.batch-msg:empty { display: none; }

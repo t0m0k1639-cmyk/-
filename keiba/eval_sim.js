@@ -33,7 +33,9 @@ for (const r of day.races) {
   const order = result.map((x) => x.number);
   const res = simulate(Object.assign({ date: day.date }, r), {
     pedigree: day.pedigree, sims: 5000,
-    cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "" },
+    cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "",
+      // 発走前までにわかっていた馬場の傾向（keiba evaluate が出す）
+      bias: (day.bias_by_race || {})[key] || null },
   });
   if (res.error) {
     console.log(`${key} | 対象外（${res.error}）`);

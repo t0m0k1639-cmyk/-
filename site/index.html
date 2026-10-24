@@ -43,6 +43,15 @@
   </section>
 
   <div id="content" hidden>
+  <div id="batch" class="batch">
+    <span class="batch-title">この後のレースをまとめて最新にする（オッズ・馬体重・馬場・傾向）</span>
+    <div class="batch-btns">
+      <button type="button" data-n="1">各会場 次の1R</button>
+      <button type="button" data-n="2">次の2R</button>
+      <button type="button" data-n="3">次の3R</button>
+    </div>
+    <span id="batch-msg" class="batch-msg" aria-live="polite"></span>
+  </div>
   <section id="review" class="review" aria-label="予想と結果" hidden></section>
   <div class="controls">
     <div class="seg" role="tablist" aria-label="並べ替え">

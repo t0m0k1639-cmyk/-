@@ -286,7 +286,8 @@
   }
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-  async function refreshRace(r, msg, btn) {
+  // 指定したレース（1つでも、まとめてでも）を取り直す。done(day) は読み直したあとに呼ぶ
+  async function refreshRaces(list, msg, btn, done) {
     if (!GH.api) { msg.textContent = "公開ページ（github.io）でだけ使えます"; return; }
     if (!token()) {
       msg.textContent = "先にページ下の「更新ボタンの設定」で合鍵を保存してください";
@@ -302,10 +303,10 @@
       tick("取得を依頼しています");
       const { default_branch: ref } = await gh("");
       await gh("/actions/workflows/refresh.yml/dispatches", {
-        method: "POST", body: JSON.stringify({ ref, inputs: { race: `${r.venue}-${r.number}`, date: state.day.date } }),
+        method: "POST", body: JSON.stringify({ ref, inputs: { race: list.map((r) => `${r.venue}-${r.number}`).join(","), date: state.day.date } }),
       });
       let run = null;
-      while (Date.now() - started < 5 * 60e3) {
+      while (Date.now() - started < (4 + list.length) * 60e3) {
         await sleep(5000);
         if (!run) {
           const list = await gh("/actions/workflows/refresh.yml/runs?event=workflow_dispatch&per_page=5");
@@ -323,12 +324,7 @@
           if ((st.checked_at || "") > before) {
             const day = await loadDay(state.day.date);
             showDay(day);
-            const card = document.getElementById(`r-${r.key}`);
-            if (card) {
-              card.querySelector(".race-head").click();
-              card.querySelector(".refresh-msg").textContent = `最新にしました（${fmtTime(day.generated_at)}）`;
-              card.scrollIntoView({ block: "start" });
-            }
+            done(day);
             return;
           }
           await sleep(5000);
@@ -341,6 +337,46 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  async function refreshRace(r, msg, btn) {
+    await refreshRaces([r], msg, btn, (day) => {
+      const card = document.getElementById(`r-${r.key}`);
+      if (card) {
+        card.querySelector(".race-head").click();
+        card.querySelector(".refresh-msg").textContent = `最新にしました（${fmtTime(day.generated_at)}）`;
+        card.scrollIntoView({ block: "start" });
+      }
+    });
+  }
+
+  // この後に発走する各競馬場の次の n レース（今日のページを見ているときだけ）
+  function upcoming(n) {
+    const now = new Date(Date.now() + 9 * 3600e3);
+    if (!state.day || state.day.date !== now.toISOString().slice(0, 10)) return null;
+    const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const toMin = (t) => { const m = (t || "").match(/^(\d+):(\d+)$/); return m ? +m[1] * 60 + +m[2] : null; };
+    const byVenue = {};
+    for (const r of state.day.races) {
+      const t = toMin(r.post_time);
+      if (t !== null && t > mins) (byVenue[r.venue] = byVenue[r.venue] || []).push([t, r]);
+    }
+    return Object.values(byVenue).flatMap((xs) => xs.sort((a, b) => a[0] - b[0]).slice(0, n).map(([, r]) => r));
+  }
+  function setupBatchRefresh() {
+    const msg = $("batch-msg");
+    document.querySelectorAll("#batch button").forEach((btn) => btn.addEventListener("click", async () => {
+      const list = upcoming(+btn.dataset.n);
+      if (list === null) { msg.textContent = "今日のレースを表示しているときに使えます"; return; }
+      if (!list.length) { msg.textContent = "この後に発走するレースはありません"; return; }
+      const names = list.map((r) => `${r.venue}${r.number}R`).join("・");
+      document.querySelectorAll("#batch button").forEach((b) => (b.disabled = true));
+      try {
+        await refreshRaces(list, msg, btn, (day) => { msg.textContent = `最新にしました：${names}（${fmtTime(day.generated_at)}）`; });
+      } finally {
+        document.querySelectorAll("#batch button").forEach((b) => (b.disabled = false));
+      }
+    }));
   }
 
   // 即PATへのリンクと、印のコピー（即PATに買い目を自動で入れる仕組みはJRAにないため、見返す用）
@@ -376,7 +412,8 @@
       const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), {
         manual: yosoOf(r).adj, train: yosoOf(r).tr, kaku: yosoOf(r).kk, pedigree: state.day.pedigree,
         // クッション値は入力がなければJRA発表の最新値を使う。含水率は競馬場ごとに基準が違うので入力したときだけ使う
-        cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || (r.cushion != null ? String(r.cushion) : ""), moist: baba.moist || "" },
+        cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || (r.cushion != null ? String(r.cushion) : ""), moist: baba.moist || "",
+          bias: biasOf(r) },
       });
       if (res.error) { out.replaceChildren(el("p", "sim-err", res.error)); return; }
       const warn = [];
@@ -389,7 +426,7 @@
         warn.push(el("p", "sim-warn", `前走データがない馬が${res.noData}頭います。その馬は平均扱いで計算しています。`));
       }
       const head = el("p", "sim-head",
-        `${res.course}・馬場${res.going}${res.goingNote ? `（${res.goingNote}）` : ""}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
+        `${res.course}・馬場${res.going}${res.goingNote ? `（${res.goingNote}）` : ""}${res.bias ? `・馬場の傾向 ${res.bias}` : ""}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
       const wrap = el("div", "sim-wrap");
       const table = el("table", "sim-table");
       const thead = el("thead");
@@ -472,6 +509,10 @@
       node.querySelector(".race-tags").replaceChildren(...tags(Object.assign({}, r, { going: b.going || r.going })));
       if (b.going && b.going !== r.going) {
         node.querySelectorAll(".race-tags .tag").forEach((x) => { if (x.textContent.startsWith("馬場")) x.textContent += "（入力）"; });
+      }
+      const bs = biasOf(r);
+      if (bs && bs.races) {
+        node.querySelector(".race-tags").append(el("span", `tag tag-bias${bs.label === "目立った傾向なし" ? "" : " on"}`, `傾向 ${bs.label}（${bs.races}R）`));
       }
     };
     refreshTags();
@@ -642,6 +683,9 @@
     return day;
   }
 
+  // ---- 開催中の馬場の傾向（前日と当日の終わったレースから。keiba/bias.py）
+  const biasOf = (r) => ((state.day && state.day.bias) || {})[`${r.venue}|${r.surface}`] || null;
+
   // ---- 予想と結果（レース後の比較）
   const reviewOf = (r) => (state.day.review ? state.day.review.races.find((x) => x.key === r.key) : null);
   const circled = (n) => (n >= 1 && n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `(${n})`);
@@ -713,6 +757,8 @@
     $("lock").hidden = true;
     $("content").hidden = false;
     renderReview(day);
+    // まとめて最新にするのは、今日のレースを見ているときだけ
+    $("batch").hidden = day.date !== new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
     renderTop(day.races);
     renderVenues(day.races);
     renderOddsToggle();
@@ -745,6 +791,7 @@
       store.set("sort", state.sort);
       renderList();
     }));
+    setupBatchRefresh();
     $("token-save").addEventListener("click", async () => {
       const v = $("gh-token").value.trim();
       if (!v) { $("token-msg").textContent = "合鍵を貼り付けてから押してください"; return; }

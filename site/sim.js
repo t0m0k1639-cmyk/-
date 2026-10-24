@@ -42,6 +42,8 @@
   const JK_WEIGHT = { A: 2.5, B: 0, C: -0.5 };
   // 同じ検証で末脚（走破タイムと上がり3Fの差）は着順とほぼ無関係だったので、効き方を1/4にする
   const AG_SCALE = 0.25;
+  // 開催中の馬場の傾向（keiba/bias.py）の効かせ方。front・inner は「ふつうとの差」（0.1 でかなり強い傾向）
+  const BIAS_FRONT = 3, BIAS_POST = 2;
   // 調教評価と脚色（以前のシミュレーターと同じ点数）。JRA公式には調教のデータがないので、自分で入れる
   const TRAIN = { A: 2, B: 1, C: 0, D: -2 };
   const KAKU = { "馬なり": 0.5, "G前仕掛け": 0.25, "強め": 0, "一杯": -0.5 };
@@ -277,9 +279,11 @@
     const wTen = (0.15 + 0.5 * (1 - t)) * ce.tenMul * ge.tenMul, wAg = AG_SCALE * (0.15 + 0.5 * t) * agMul * ce.agMul * ge.agMul;
     const postSign = { in: 1, flat: 0, out: -1 }[c.post];
     const styleSign = { front: 1, flat: 0, back: -1 }[c.style];
-    const base = hs.map((h, i) => extra[i] + ce.crMul * cr[i] + wTen * ten[i] + wAg * ag[i] + (postSign * k + ce.post) * (1 - 2 * h.gate));
+    const bias = c.bias || {};
+    const biasPost = clamp(BIAS_POST * (bias.inner || 0), -0.3, 0.3);
+    const base = hs.map((h, i) => extra[i] + ce.crMul * cr[i] + wTen * ten[i] + wAg * ag[i] + (postSign * k + ce.post + biasPost) * (1 - 2 * h.gate));
     const early = hs.map((h, i) => ten[i] * 0.7 + STYLE_FRONT[h.style] * 1.5);
-    const frontK = paceFront + styleSign * k + ce.front + ge.front;
+    const frontK = paceFront + styleSign * k + ce.front + ge.front + clamp(BIAS_FRONT * (bias.front || 0), -0.4, 0.4);
     // 揺らぎは馬ごとの点数差の大きさに比例させる（補正を重ねても勝率が極端にならないように）
     const mB = base.reduce((a, b) => a + b, 0) / n;
     const sdB = Math.sqrt(base.reduce((a, b) => a + (b - mB) ** 2, 0) / n) || 1;
@@ -339,6 +343,7 @@
       : `${cfg.going}${cfg.surface === "turf" && cfg.cushion !== "" && cfg.cushion != null ? `・クッション値${cfg.cushion}` : ""}`;
     return {
       rows, sims: N, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
+      bias: cfg.bias && cfg.bias.races ? `${cfg.bias.label}（${cfg.bias.races}レース分）` : "",
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
   }

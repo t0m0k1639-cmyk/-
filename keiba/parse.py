@@ -522,7 +522,7 @@ def parse_going(text: str) -> dict[str, str]:
 
 
 def parse_result(html: str) -> list[dict]:
-    """レース結果の表（td.place・td.num・td.pop）を着順に読む。中止・除外などの着順のない馬は除く。"""
+    """レース結果の表（td.place・td.num・td.pop・td.corner）を着順に読む。中止・除外などの着順のない馬は除く。"""
     rows = []
     for tr in BeautifulSoup(html, "html.parser").select("table tr"):
         place, num, pop = (tr.find("td", class_=c) for c in ("place", "num", "pop"))
@@ -531,5 +531,11 @@ def parse_result(html: str) -> list[dict]:
         p, n = _digits(norm(place.get_text())), _digits(norm(num.get_text()))
         if p is None or n is None:
             continue
-        rows.append({"place": p, "number": n, "popularity": _digits(norm(pop.get_text())) if pop else None})
+        corner = tr.find("td", class_="corner")
+        rows.append({
+            "place": p, "number": n,
+            "popularity": _digits(norm(pop.get_text())) if pop else None,
+            # 各コーナーの通過順（最後が4角）
+            "corners": [int(t) for t in (_text(li) for li in corner.select("li")) if t.isdigit()] if corner else [],
+        })
     return sorted(rows, key=lambda r: r["place"])

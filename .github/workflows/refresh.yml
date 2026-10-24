@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       race:
-        description: "レース（例: 東京-10）"
+        description: "レース（例: 東京-10。まとめては 東京-10,京都-10）"
         required: true
       date:
         description: "対象日 YYYY-MM-DD（空なら今日）"

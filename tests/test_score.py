@@ -103,7 +103,8 @@ def test_refresh_replaces_one_race(tmp_path, monkeypatch):
     monkeypatch.setenv("PAGE_PASSWORD", "pw")
     monkeypatch.setattr(m, "Fetcher", lambda *a, **k: type("F", (), {"count": 3})())
     monkeypatch.setattr(jra, "is_race_day", lambda f, d: (True, None, None, ""))
-    monkeypatch.setattr(jra, "collect_one", lambda f, d, t, v, n: new if (v, n) == ("東京", 2) else None)
+    monkeypatch.setattr(jra, "collect_some", lambda f, d, t, w: [new] if ("東京", 2) in w else [])
+    monkeypatch.setattr(jra, "collect_results", lambda f, d, want=None: {})
     monkeypatch.setattr(jra, "collect_going", lambda f: {})
     monkeypatch.setattr(jra, "collect_baba_data", lambda f: {})
     assert m.main(["refresh", "--race", "東京-2", "--date", "2026-10-24", "--data", str(tmp_path)]) == 0

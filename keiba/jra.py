@@ -97,16 +97,18 @@ def collect(f: Fetcher, today: date, top_d: str) -> list[Race]:
     return races
 
 
-def collect_one(f: Fetcher, today: date, top_d: str, venue: str, number: int) -> Race | None:
-    """1レースだけ取り直す（更新ボタン用）。"""
+def collect_some(f: Fetcher, today: date, top_d: str, wanted: set[tuple[str, int]]) -> list[Race]:
+    """指定したレースだけ取り直す（更新ボタン用）。開催ページは競馬場ごとに1回だけ開く。"""
+    out: list[Race] = []
+    venues = {v for v, _ in wanted}
     for v, day in _venue_days(f, today, top_d):
-        if v != venue:
+        if v not in venues:
             continue
         page = f.post_cname(day.path, day.cname)
         for row in parse.parse_day_rows(page):
-            if row.fields.get("number") == number:
-                return _build_race(f, venue, row)
-    return None
+            if (v, row.fields.get("number")) in wanted:
+                out.append(_build_race(f, v, row))
+    return out
 
 
 def _odds(f: Fetcher, link: parse.Link) -> list[float]:
@@ -154,8 +156,11 @@ def merge_going(races: list[Race], going: dict, baba: dict | None = None) -> Non
             r.baba_time = b.get("cushion_time") or b.get("moist_time")
 
 
-def collect_results(f: Fetcher, today: date) -> dict[str, list[dict]]:
-    """当日の全レースの着順を {"東京-11": [{place, number, popularity}, ...]} で返す。"""
+def collect_results(f: Fetcher, today: date, want=None) -> dict[str, list[dict]]:
+    """当日のレースの着順を {"東京-11": [{place, number, popularity, corners}, ...]} で返す。
+
+    want を渡すと、want("東京-11") が真のレースだけ結果ページを開く（取得済みや発走前を飛ばす）。
+    """
     home = parse.extract_actions(f.get("/"))
     entry = next(((a.path, a.cname) for a in home if a.path.endswith("accessS.html") and "pw01sli" in a.cname),
                  ("/JRADB/accessS.html", "pw01sli00/AF"))
@@ -164,7 +169,7 @@ def collect_results(f: Fetcher, today: date) -> dict[str, list[dict]]:
     for day in _day_actions(top, "accessS.html", today):
         venue = parse.parse_venue(day.text) or parse.parse_venue(day.context) or "不明"
         for row in parse.parse_day_rows(f.post_cname(day.path, day.cname)):
-            if not row.race_link:
+            if not row.race_link or (want and not want(f"{venue}-{row.fields['number']}")):
                 continue
             try:
                 res = parse.parse_result(_open(f, row.race_link))

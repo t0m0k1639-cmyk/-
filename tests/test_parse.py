@@ -258,9 +258,10 @@ def test_body_weight():
 def test_parse_result():
     html = """<table><tr><th class="place">着順</th></tr>
     <tr><td class="place">2</td><td class="num">8</td><td class="pop">3</td></tr>
-    <tr><td class="place">1</td><td class="num">12</td><td class="pop">1</td></tr>
+    <tr><td class="place">1</td><td class="num">12</td><td class="pop">1</td>
+      <td class="corner"><div class="corner_list"><ul><li title="3コーナー">6</li><li title="4コーナー">5</li></ul></div></td></tr>
     <tr><td class="place">中止</td><td class="num">5</td><td class="pop">9</td></tr></table>"""
     assert parse.parse_result(html) == [
-        {"place": 1, "number": 12, "popularity": 1},
-        {"place": 2, "number": 8, "popularity": 3},
+        {"place": 1, "number": 12, "popularity": 1, "corners": [6, 5]},
+        {"place": 2, "number": 8, "popularity": 3, "corners": []},
     ]
