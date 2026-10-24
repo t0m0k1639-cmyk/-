@@ -37,6 +37,16 @@ def main() -> None:
             for m in re.finditer(r"(?i)\.(json|xml|csv|js)\b[^\"']*", html):
                 pass
             print("データファイルらしきもの:", sorted(set(re.findall(r'["\']([^"\']*(?:baba|cushion|moist)[^"\']*\.(?:json|xml|csv|js))["\']', html)))[:20])
+    js = f.get("/keiba/baba/_js/baba2025.js")
+    print("\n=== baba2025.js（cushion・url・ajax を含む行）===")
+    for line in js.splitlines():
+        if re.search(r"(?i)cushion|\.json|\.xml|\.csv|ajax|\$\.get|fetch\(|url", line):
+            print(line.strip()[:300])
+    arch = f.get("/keiba/baba/archive/")
+    t = parse.page_text(parse.main_part(arch))
+    i = t.find("クッション値")
+    print("\n=== 過去の含水率・クッション値 ===", t[i:i + 800] if i >= 0 else t[:800])
+    print("archive 内リンク:", sorted(set(re.findall(r'href="([^"]*archive[^"]*)"', arch)))[:20])
     print("\nリクエスト数:", f.count)
 
 
