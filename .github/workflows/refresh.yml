@@ -29,7 +29,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # 呼び出した時点ではなく、順番が来た時点のブランチの先頭を使う（直前の更新を取りこぼさないため）
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -47,6 +50,7 @@ jobs:
         run: python -m keiba refresh --race "$TARGET_RACE" ${TARGET_DATE:+--date "$TARGET_DATE"}
 
       - name: data/ をコミット
+        id: commit
         if: always()
         env:
           TARGET_RACE: ${{ inputs.race }}
@@ -56,17 +60,18 @@ jobs:
           git add data
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "data: ${TARGET_RACE} を更新（$(TZ=Asia/Tokyo date '+%H:%M')）"
-          git pull --rebase -q
+          # 重なったら壊れたデータを公開しないよう、ここで止める
+          git pull --rebase -q || { git rebase --abort; echo "::error::data/ が重なったので公開を中止しました。もう一度押してください"; exit 1; }
           git push
 
       - run: python -m keiba build-site --out _site
-        if: always()
+        if: always() && steps.commit.outcome == 'success'
 
       - uses: actions/upload-pages-artifact@v3
-        if: always()
+        if: always() && steps.commit.outcome == 'success'
         with:
           path: _site
 
       - uses: actions/deploy-pages@v4
         id: deploy
-        if: always()
+        if: always() && steps.commit.outcome == 'success'

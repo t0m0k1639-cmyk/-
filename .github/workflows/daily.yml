@@ -30,7 +30,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # 呼び出した時点ではなく、順番が来た時点のブランチの先頭を使う（直前の更新を取りこぼさないため）
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
