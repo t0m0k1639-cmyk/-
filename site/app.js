@@ -246,12 +246,24 @@
     return { owner, repo, api: owner && repo ? `https://api.github.com/repos/${owner}/${repo}` : null };
   })();
   const token = () => store.get("ghToken");
+  // 失敗したときは、どこを直せばよいかを具体的に返す
   async function gh(path, opts = {}) {
-    const r = await fetch(GH.api + path, Object.assign({}, opts, {
-      headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token()}`, "X-GitHub-Api-Version": "2022-11-28" },
-    }));
-    if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error("合鍵が違うか、権限が足りません（設定を確認してください）");
-    if (!r.ok) throw new Error(`GitHub ${r.status}`);
+    let r;
+    try {
+      r = await fetch(GH.api + path, Object.assign({}, opts, {
+        headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token()}`, "X-GitHub-Api-Version": "2022-11-28" },
+      }));
+    } catch (_) {
+      throw new Error("GitHub につながりませんでした。通信状態を確かめてください");
+    }
+    if (r.status === 401) throw new Error("【401】合鍵が違うか、期限切れです。合鍵を作り直して保存してください");
+    if (r.status === 404) throw new Error(`【404】合鍵でこのリポジトリ（${GH.repo}）が選ばれていません。合鍵の「Repository access」で「${GH.repo}」を選んでください`);
+    if (r.status === 403 || r.status === 422) {
+      throw new Error(opts.method === "POST"
+        ? `【${r.status}】合鍵に「Actions」の書き込み権限がありません。「Repository permissions」の「Actions」を「Read and write」にしてください`
+        : `【${r.status}】合鍵の権限が足りません。「Repository permissions」の「Actions」を「Read and write」にしてください`);
+    }
+    if (!r.ok) throw new Error(`GitHub からエラーが返りました（${r.status}）`);
     return r.status === 204 ? null : r.json();
   }
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -307,7 +319,7 @@
       }
       throw new Error("時間がかかりすぎています。少し待って再読み込みしてください");
     } catch (e) {
-      msg.textContent = e.message;
+      msg.textContent = `うまくいきませんでした：${e.message}`;
     } finally {
       btn.disabled = false;
     }
@@ -608,7 +620,7 @@
       try {
         if (!GH.api) throw new Error("公開ページ（github.io）でだけ確認できます");
         await gh("/actions/workflows/refresh.yml");
-        $("token-msg").textContent = "保存しました。各レースの「このレースを最新にする」が使えます。";
+        $("token-msg").textContent = "保存しました（読み取りは確認済み）。各レースの「このレースを最新にする」を押すと、書き込み権限も確かめます。";
       } catch (e) {
         $("token-msg").textContent = `保存しましたが、確認できませんでした：${e.message}`;
       }
