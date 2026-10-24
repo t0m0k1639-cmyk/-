@@ -27,11 +27,16 @@ def main() -> None:
         for w in ("クッション値", "含水率"):
             for s in around(text, w):
                 print(f"[{w}] {s}")
-        soup = parse.BeautifulSoup(html, "html.parser")
-        for el in soup.find_all(string=re.compile("含水率|クッション値"))[:2]:
-            box = el.find_parent(["table", "div", "section"])
-            if box:
-                print("--- HTML ---", re.sub(r"\s+", " ", str(box))[:1500])
+        if i == 0:
+            # クッション値の数字がどこにあるか（画像・スクリプト・属性など）
+            for m in re.finditer(r"(?i)cushion|クッション値", html):
+                seg = re.sub(r"\s+", " ", html[max(0, m.start() - 150):m.start() + 350])
+                if "基礎知識" not in seg:
+                    print("--- クッション値付近のHTML ---", seg)
+            print("script src:", re.findall(r'<script[^>]+src="([^"]+)"', html)[:20])
+            for m in re.finditer(r"(?i)\.(json|xml|csv|js)\b[^\"']*", html):
+                pass
+            print("データファイルらしきもの:", sorted(set(re.findall(r'["\']([^"\']*(?:baba|cushion|moist)[^"\']*\.(?:json|xml|csv|js))["\']', html)))[:20])
     print("\nリクエスト数:", f.count)
 
 
