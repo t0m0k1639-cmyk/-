@@ -42,6 +42,9 @@
   const JK_WEIGHT = { A: 2.5, B: 0, C: -0.5 };
   // 同じ検証で末脚（走破タイムと上がり3Fの差）は着順とほぼ無関係だったので、効き方を1/4にする
   const AG_SCALE = 0.25;
+  // 調教評価と脚色（以前のシミュレーターと同じ点数）。JRA公式には調教のデータがないので、自分で入れる
+  const TRAIN = { A: 2, B: 1, C: 0, D: -2 };
+  const KAKU = { "馬なり": 0.5, "G前仕掛け": 0.25, "強め": 0, "一杯": -0.5 };
   const JK_TOP = ["C.ルメール", "川田将雅", "戸崎圭太", "横山武史", "坂井瑠星", "武豊", "岩田望来", "松山弘平", "鮫島克駿", "西村淳也", "横山和生", "北村友一", "菅原明良", "佐々木大輔"];
 
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -259,7 +262,8 @@
     const perKg = 0.9 * clamp(c.dist / 1600, 0.75, 1.4); // 1kg≒0.15秒（1600m基準・距離が長いほど大きく）
     const extra = hs.map((h) => {
       const kinTerm = (kinMean != null && Number.isFinite(h.kin)) ? -perKg * (h.kin - kinMean) : -0.9 * (h.kinDiff || 0);
-      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (h.bwAdj || 0);
+      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (h.bwAdj || 0)
+        + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0);
       if (ge.lvl && h.wetDiff != null) p += ge.lvl * clamp(h.wetDiff, -6, 6) * 0.6 * (h.wetN / (h.wetN + 1.5));
       return p / 5;
     });
@@ -311,6 +315,9 @@
       h.gate = n > 1 ? i / (n - 1) : 0;
       h.manual = (opts.manual || {})[h.num] || 0;
       if (h.manual) h.notes.unshift(`自分の補正${h.manual > 0 ? "+" : ""}${h.manual}`);
+      h.train = (opts.train || {})[h.num] || "";
+      h.kaku = (opts.kaku || {})[h.num] || "";
+      if (h.train || h.kaku) h.notes.unshift(`調教${h.train}${h.train && h.kaku ? "・" : ""}${h.kaku}`);
     });
     const noData = hs.filter((h) => h.cr === null && h.ten === null && h.ag === null).length;
     const byPedigree = hs.filter((h) => h.byPedigree).length;

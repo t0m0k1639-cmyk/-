@@ -15,10 +15,11 @@
   let yoso = {};
   try { yoso = JSON.parse(store.get("yoso") || "{}") || {}; } catch (_) { yoso = {}; }
   const yosoKey = (r) => `${state.day.date}|${r.key}`;
-  const yosoOf = (r) => Object.assign({ m: {}, memo: "", adj: {} }, yoso[yosoKey(r)]);
+  const yosoOf = (r) => Object.assign({ m: {}, memo: "", adj: {}, tr: {}, kk: {} }, yoso[yosoKey(r)]);
   function saveYoso(r, v) {
     const b = v.baba || {};
     if (!Object.values(v.m).some(Boolean) && !v.memo && !Object.values(v.adj || {}).some(Boolean)
+        && !Object.values(v.tr || {}).some(Boolean) && !Object.values(v.kk || {}).some(Boolean)
         && !b.going && !b.cushion && !b.moist) delete yoso[yosoKey(r)];
     else yoso[yosoKey(r)] = v;
     store.set("yoso", JSON.stringify(yoso));
@@ -174,8 +175,15 @@
     }
     const pb = pedBadge(h.sire);
     if (pb) main.append(el("span", `ped-badge ${pb === "芝向き" ? "turf" : "dirt"}`, `父:${pb}`));
-    const adjNow = yosoOf(r).adj[h.number] || 0;
-    if (adjNow) main.append(el("span", `adj-badge ${adjNow > 0 ? "plus" : "minus"}`, `補正${adjNow > 0 ? "+" : ""}${adjNow}`));
+    const badges = el("span", "h-badges");
+    const renderBadges = () => {
+      const y = yosoOf(r), a = y.adj[h.number] || 0, t = y.tr[h.number], k = y.kk[h.number];
+      badges.replaceChildren();
+      if (t || k) badges.append(el("span", `adj-badge ${t === "A" || t === "B" ? "plus" : t === "D" ? "minus" : "flat"}`, `調教${t || ""}${t && k ? "・" : ""}${k || ""}`));
+      if (a) badges.append(el("span", `adj-badge ${a > 0 ? "plus" : "minus"}`, `補正${a > 0 ? "+" : ""}${a}`));
+    };
+    renderBadges();
+    main.append(badges);
     const past = h.past || [];
     if (past.length) {
       const chips = el("span", "h-past");
@@ -207,27 +215,35 @@
     if (past.length) ul.append(...past.map(pastLine));
     else ul.append(el("li", "", "前走のデータはありません（新馬など）"));
 
-    // 自分の補正（シミュレーションに反映）
-    const adjBox = el("div", "adj");
-    adjBox.append(el("span", "adj-label", "自分の補正（シミュレーションに反映）"));
-    const seg = el("div", "adj-seg");
-    [-2, -1, 0, 1, 2].forEach((v) => {
-      const b = Object.assign(el("button", "", v > 0 ? `+${v}` : v === 0 ? "±0" : String(v)), { type: "button" });
-      b.setAttribute("aria-pressed", String((yosoOf(r).adj[h.number] || 0) === v));
-      b.addEventListener("click", () => {
-        const y = yosoOf(r);
-        y.adj[h.number] = v;
-        if (!v) delete y.adj[h.number];
-        saveYoso(r, y);
-        seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-        main.querySelector(".adj-badge")?.remove();
-        if (v) main.insertBefore(el("span", `adj-badge ${v > 0 ? "plus" : "minus"}`, `補正${v > 0 ? "+" : ""}${v}`), main.querySelector(".h-past"));
-      });
-      seg.append(b);
-    });
-    adjBox.append(seg);
+    // 調教・脚色・自分の補正（シミュレーションに反映）。field は yoso の項目名、空の値は「入れていない」
+    const segBox = (label, field, options, none = "") => {
+      const box = el("div", "adj");
+      box.append(el("span", "adj-label", label));
+      const seg = el("div", "adj-seg");
+      seg.style.gridTemplateColumns = `repeat(${options.length}, minmax(0, 1fr))`;
+      for (const [v, text] of options) {
+        const b = Object.assign(el("button", "", text), { type: "button" });
+        b.setAttribute("aria-pressed", String((yosoOf(r)[field][h.number] || none) === v));
+        b.addEventListener("click", () => {
+          const y = yosoOf(r);
+          if (v) y[field][h.number] = v; else delete y[field][h.number];
+          saveYoso(r, y);
+          seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          renderBadges();
+        });
+        seg.append(b);
+      }
+      box.append(seg);
+      return box;
+    };
     td.append(info, ul);
-    if (!h.scratched) td.append(adjBox);
+    if (!h.scratched) {
+      td.append(
+        segBox("調教評価（以前のシミュレーターと同じ：A +2・B +1・C 0・D −2）", "tr", [["", "—"], ["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"]]),
+        segBox("調教の脚色", "kk", [["", "—"], ["馬なり", "馬なり"], ["G前仕掛け", "G前"], ["強め", "強め"], ["一杯", "一杯"]]),
+        segBox("自分の補正", "adj", [[-2, "-2"], [-1, "-1"], [0, "±0"], [1, "+1"], [2, "+2"]], 0),
+      );
+    }
     detail.append(td);
     nameBtn.setAttribute("aria-expanded", "false");
     nameBtn.addEventListener("click", () => {
@@ -356,7 +372,7 @@
     setTimeout(() => {
       const baba = yosoOf(r).baba || {};
       const res = window.RaceSim.simulate(Object.assign({ date: state.day.date }, r), {
-        manual: yosoOf(r).adj, pedigree: state.day.pedigree,
+        manual: yosoOf(r).adj, train: yosoOf(r).tr, kaku: yosoOf(r).kk, pedigree: state.day.pedigree,
         // クッション値は入力がなければJRA発表の最新値を使う。含水率は競馬場ごとに基準が違うので入力したときだけ使う
         cfg: { going: baba.going || r.going || "良", cushion: baba.cushion || (r.cushion != null ? String(r.cushion) : ""), moist: baba.moist || "" },
       });

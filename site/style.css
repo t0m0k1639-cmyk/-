@@ -348,7 +348,7 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .h-info dd { margin: 0; overflow-wrap: anywhere; }
 .adj { display: grid; gap: 4px; margin-top: 8px; }
 .adj-label { font-size: 0.6875rem; color: var(--muted); font-weight: 700; }
-.adj-seg { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; max-width: 320px; }
+.adj-seg { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; max-width: 320px; }
 .adj-seg button {
   font: inherit; font-size: var(--step--1); font-family: var(--font-num); border: 0; border-left: 1px solid var(--line);
   background: var(--surface); color: var(--fg); padding: 6px 0; cursor: pointer;
@@ -358,6 +358,9 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .adj-badge { display: inline-block; font-size: 0.6875rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-top: 2px; }
 .adj-badge.plus { background: var(--hon-soft); color: var(--hon); }
 .adj-badge.minus { background: var(--err-bg); color: var(--err-fg); }
+.adj-badge.flat { background: var(--accent-soft); color: var(--accent); }
+.h-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.h-badges:empty { display: none; }
 .sim-warn { margin: 0; font-size: var(--step--1); background: var(--warn-bg); color: var(--warn-fg); border-radius: 6px; padding: 6px 10px; }
 .horses tr.past-detail td { text-align: left; padding-left: 12px; padding-right: 12px; }
 .ped-badge { display: inline-block; font-size: 0.6875rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin: 2px 4px 0 0; border: 1px solid currentColor; }
