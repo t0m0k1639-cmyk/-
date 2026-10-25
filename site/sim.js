@@ -120,10 +120,11 @@
     const m = parseFloat(cfg.moist), cu = parseFloat(cfg.cushion);
     if (dirt && Number.isFinite(m)) lvl = clamp((m - 5) / 10, 0, 1);   // 含水率が分かればそちらで決める
     const e = { lvl, front: 0, tenMul: 1, agMul: 1, sigma: 0, txt: [] };
-    if (dirt) { e.front = 0.1 * lvl; e.tenMul = 1 + 0.15 * lvl; if (lvl) e.txt.push("脚抜けが良く前寄り・テン重視"); }
+    // 道悪の効き方は推定（2026/10 に強めた。道悪の日の結果がたまったら見直す）
+    if (dirt) { e.front = 0.25 * lvl; e.tenMul = 1 + 0.3 * lvl; if (lvl) e.txt.push("脚抜けが良く前が止まりにくい・テン重視"); }
     else {
-      e.agMul = 1 - 0.15 * lvl; e.sigma = 0.1 * lvl; e.front = 0.05 * lvl;
-      if (lvl) e.txt.push("時計がかかり上がり勝負になりにくい・波乱度アップ");
+      e.agMul = 1 - 0.15 * lvl; e.sigma = 0.2 * lvl; e.front = 0.15 * lvl;
+      if (lvl) e.txt.push("時計がかかり差しが届きにくい・紛れやすい");
       if (Number.isFinite(cu)) {
         if (cu >= 10.5) { e.agMul *= 1.06; e.txt.push("クッション値高め：硬く速い馬場"); }
         else if (cu <= 8) { e.agMul *= 0.92; e.sigma += 0.05; e.txt.push("クッション値低め：軟らかい馬場"); }
@@ -266,7 +267,12 @@
       const kinTerm = (kinMean != null && Number.isFinite(h.kin)) ? -perKg * (h.kin - kinMean) : -0.9 * (h.kinDiff || 0);
       let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (h.bwAdj || 0)
         + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0);
-      if (ge.lvl && h.wetDiff != null) p += ge.lvl * clamp(h.wetDiff, -6, 6) * 0.6 * (h.wetN / (h.wetN + 1.5));
+      if (ge.lvl && h.wetDiff != null) {
+        // 道悪での成績が良のときより良いか悪いか（走った回数が少ないうちは弱める）
+        const wet = ge.lvl * clamp(h.wetDiff, -6, 6) * 1.2 * (h.wetN / (h.wetN + 1.5));
+        p += wet;
+        if (Math.abs(wet) >= 1) h.notes.unshift(wet > 0 ? "道悪巧者で加点" : "道悪苦手で減点");
+      }
       return p / 5;
     });
     const pace = c.pace === "auto" ? autoPace(hs).pace : c.pace;
