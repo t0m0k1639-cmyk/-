@@ -72,11 +72,16 @@ def _build_race(f: Fetcher, venue: str, row: parse.DayRow) -> Race:
     running = [h for h in race.horses if not h.scratched]
     if running:
         race.field_size = len(running)
-    # 当日は出馬表に単勝オッズが載る。載っていなければオッズのページを読む
+    # 当日は出馬表に単勝オッズが載る。複勝オッズ（買い候補の期待値に使う）はオッズのページから読む
     race.win_odds = [h.odds for h in running if h.odds]
-    if not race.win_odds and row.odds_link:
+    if row.odds_link:
         try:
-            race.win_odds = _odds(f, row.odds_link)
+            table = odds_table(f, row.odds_link)
+            for h in running:
+                o = table.get(h.number) or {}
+                h.odds = h.odds or o.get("win")
+                h.place_odds = o.get("place")
+            race.win_odds = race.win_odds or [h.odds for h in running if h.odds]
         except Exception as e:
             log.warning("%s%dR のオッズを読めませんでした: %s", venue, race.number, e)
     return race
@@ -109,17 +114,6 @@ def collect_some(f: Fetcher, today: date, top_d: str, wanted: set[tuple[str, int
             if (v, row.fields.get("number")) in wanted:
                 out.append(_build_race(f, v, row))
     return out
-
-
-def _odds(f: Fetcher, link: parse.Link) -> list[float]:
-    html = _open(f, link)
-    odds = parse.parse_win_odds(html)
-    if not odds:
-        # 単勝・複勝のタブが別ページのとき
-        tan = next((l for l in parse.extract_links(html) if "単勝" in l.text), None)
-        if tan:
-            odds = parse.parse_win_odds(_open(f, tan))
-    return odds
 
 
 def odds_table(f: Fetcher, link: parse.Link) -> dict[int, dict]:

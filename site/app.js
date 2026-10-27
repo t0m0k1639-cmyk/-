@@ -196,6 +196,9 @@
     if (h.odds != null) {
       odds.append(el("span", "h-win", h.odds.toFixed(1)));
       if (h.popularity) odds.append(el("span", `h-pop${h.popularity <= 3 ? " top" : ""}`, `${h.popularity}人気`));
+      if (h.place_odds) odds.append(el("span", "h-plc", `複${h.place_odds[0].toFixed(1)}-${h.place_odds[1].toFixed(1)}`));
+      const pv = pvOf(r).find((x) => x.num === h.number);
+      if (pv && pv.buy) odds.append(el("span", "h-pv", `複勝候補 ${pv.ev.toFixed(2)}`));
     } else {
       odds.append(el("span", "h-none", h.scratched ? "—" : "未発表"));
     }
@@ -646,6 +649,43 @@
     b.textContent = state.showOdds ? "オッズ表示中" : "オッズを隠しています";
   }
 
+  // ---- 複勝の買い候補（単勝オッズから出した3着内率 × 複勝の下限が1.0以上。sim.js の placeValue）
+  const pvCache = new WeakMap();
+  function pvOf(r) {
+    if (!pvCache.has(r)) pvCache.set(r, window.RaceSim.placeValue(r));
+    return pvCache.get(r);
+  }
+  function renderBuy(day) {
+    const now = new Date(Date.now() + 9 * 3600e3);
+    const today = day.date === now.toISOString().slice(0, 10);
+    const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const toMin = (t) => { const m = (t || "").match(/^(\d+):(\d+)$/); return m ? +m[1] * 60 + +m[2] : null; };
+    const items = day.races.flatMap((r) => pvOf(r).filter((x) => x.buy).map((x) => ({ r, x })))
+      .sort((a, b) => (toMin(a.r.post_time) ?? 9999) - (toMin(b.r.post_time) ?? 9999) || b.x.ev - a.x.ev);
+    const anyPlace = day.races.some((r) => (r.horses || []).some((h) => h.place_odds));
+    $("buy").hidden = !anyPlace;
+    if (!anyPlace) return;
+    $("buy-note").textContent = items.length
+      ? `${fmtTime(day.generated_at)}時点のオッズ。締め切り前に「最新にする」で取り直すと入れ替わります。過去1年の検証では的中約7割・回収率100〜114%（新馬戦は除く）`
+      : `${fmtTime(day.generated_at)}時点のオッズでは、条件を満たす馬はいません`;
+    $("buy-list").replaceChildren(...items.map(({ r, x }) => {
+      const h = r.horses.find((y) => y.number === x.num);
+      const done = today && toMin(r.post_time) !== null && toMin(r.post_time) <= mins;
+      const place = placeOf(reviewOf(r), x.num);
+      const li = el("li", done || place ? "done" : "");
+      const a = Object.assign(document.createElement("a"), { href: `#r-${r.key}` });
+      a.append(
+        el("span", "b-race", `${r.venue}${r.number}R`),
+        el("span", "b-horse", `${circled(x.num)} ${h ? h.name : ""}`),
+        el("span", "b-ev", `期待値 ${x.ev.toFixed(2)}`),
+        el("span", "b-sub", [r.post_time && `${r.post_time}発走`, `複勝 ${x.lo.toFixed(1)}-${x.hi.toFixed(1)}倍`,
+          `3着内 ${Math.round(x.p3 * 100)}%（オッズから）`, place ? `結果 ${place}着` : null].filter(Boolean).join("・")),
+      );
+      li.append(a);
+      return li;
+    }));
+  }
+
   function renderTop(races) {
     const top = [...races].sort((a, b) => b.target - a.target).filter((r) => r.target > 0).slice(0, 3);
     $("top").hidden = !top.length;
@@ -777,6 +817,7 @@
     // まとめて最新にするのは、今日のレースを見ているときだけ
     $("batch").hidden = day.date !== new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
     renderTop(day.races);
+    renderBuy(day);
     renderVenues(day.races);
     renderOddsToggle();
     renderList();
@@ -784,6 +825,8 @@
 
   function showLock(message) {
     $("content").hidden = true;
+    $("top").hidden = true;
+    $("buy").hidden = true;
     $("lock").hidden = false;
     $("meta").textContent = "パスワードで保護されています";
     const err = $("lock-error");

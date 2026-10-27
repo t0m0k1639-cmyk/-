@@ -114,6 +114,22 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 .top-list .t-score { font-family: var(--font-num); font-weight: 600; color: var(--accent); }
 .top-list a { color: inherit; text-decoration: none; display: grid; gap: 2px; }
 
+/* 複勝の買い候補 */
+.buy { display: grid; gap: 6px; }
+.buy-note { margin: 0; font-size: var(--step--1); color: var(--muted); }
+.buy-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.buy-list li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.buy-list li.done { opacity: 0.55; }
+.buy-list a { color: inherit; text-decoration: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 2px 10px; align-items: baseline; padding: 8px 10px; }
+.buy-list .b-race { font-weight: 900; }
+.buy-list .b-horse { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buy-list .b-ev { font-family: var(--font-num); font-weight: 600; color: var(--hon); }
+.buy-list .b-sub { grid-column: 2 / -1; font-size: var(--step--1); color: var(--muted); }
+.h-plc { display: block; font-family: var(--font-num); font-size: 0.6875rem; color: var(--muted); }
+.h-pv { display: inline-block; margin-top: 2px; padding: 0 6px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700;
+  background: var(--hon-soft); color: var(--hon); }
+
 /* 操作 */
 .controls { display: grid; gap: 10px; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface);

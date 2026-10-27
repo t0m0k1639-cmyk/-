@@ -13,6 +13,7 @@ class Horse:
     jockey: str | None = None
     trainer: str | None = None
     odds: float | None = None       # 単勝オッズ
+    place_odds: list[float] | None = None  # 複勝オッズ [下限, 上限]（買い候補の期待値に使う）
     popularity: int | None = None   # 人気
     scratched: bool = False         # 取消・除外
     past: list[dict] = field(default_factory=list)  # 前走から新しい順に最大4走

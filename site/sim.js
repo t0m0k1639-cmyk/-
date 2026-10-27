@@ -386,6 +386,39 @@
     };
   }
 
+  // ---- 複勝の買い候補。単勝オッズから出した3着内率 × 複勝オッズの下限 = 期待値。
+  // 2026/10 の検証（新馬戦を除く・確定オッズ）で「期待値1.0以上・下限3倍まで」が
+  // 2025/10〜2026/6 は376頭・的中69%・回収率100%、2026/7〜10 は215頭・的中67%・回収率114%だった。
+  // シミュレーションの点数を足しても良くならなかったので、オッズだけで出す。
+  const PLACE_RULE = { minEv: 1.0, maxLo: 3 };
+  function harville3(p) {
+    const n = p.length, out = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      out[i] += p[i];
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        out[i] += p[j] * p[i] / (1 - p[j]);
+        for (let k = 0; k < n; k++) {
+          if (k !== i && k !== j) out[i] += p[k] * p[j] / (1 - p[k]) * p[i] / (1 - p[k] - p[j]);
+        }
+      }
+    }
+    return out;
+  }
+  // [{num, p3, lo, hi, ev, buy}]。オッズが出ていない・新馬戦・障害戦・5頭未満は []
+  function placeValue(race) {
+    if (race.surface === "障害" || (race.race_class || "").includes("新馬")) return [];
+    const hs = (race.horses || []).filter((h) => !h.scratched && h.odds);
+    if (hs.length < 5) return [];
+    const inv = hs.reduce((a, h) => a + 1 / h.odds, 0);
+    const p3 = harville3(hs.map((h) => 1 / h.odds / inv));
+    return hs.map((h, i) => {
+      const [lo, hi] = h.place_odds || [null, null];
+      const ev = lo ? p3[i] * lo : null;
+      return { num: h.number, p3: p3[i], lo, hi, ev, buy: ev != null && ev >= PLACE_RULE.minEv && lo <= PLACE_RULE.maxLo };
+    });
+  }
+
   // _internal は成績の検証用（keiba/diag_sim.js）
-  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
+  window.RaceSim = { simulate, pedStats, placeValue, PLACE_RULE, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
 })();
