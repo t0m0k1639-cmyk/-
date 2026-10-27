@@ -40,6 +40,12 @@ def main() -> None:
     a = soup.select_one("th.race_num a[href]")
     res = jra._open(f, parse.Link(a["href"], None, ""))
     rs = parse.BeautifulSoup(res, "html.parser")
+    # 着順の表の見出しと最初の2頭（オッズの欄があるか）
+    for th in rs.select("table thead tr")[:1]:
+        print("\n見出し:", masked(str(th), 3000))
+    for row in [t for t in rs.select("table tbody tr") if t.find("td", class_="num")][:2]:
+        print("\n1頭:", masked(str(row), 3000))
+    print("\nオッズへのリンク:", [masked(str(x), 300) for x in rs.find_all("a", href=True) if "odds" in x["href"].lower() or "pw15" in x["href"]][:5])
     # 払戻金の欄（class に refund / pay / harai を含む要素）
     import re
     for el in rs.find_all(class_=re.compile(r"refund|pay|harai", re.I))[:3]:
