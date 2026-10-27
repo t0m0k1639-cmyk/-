@@ -348,6 +348,9 @@ def cmd_backtest(args) -> int:
         finally:
             backtest.save_cache(data_dir, password, cache)
             set_output("updated", "true")
+    from collections import Counter
+    log.info("控えの月ごとのレース数: %s", dict(sorted(Counter(k[:7] for k in cache["races"]).items())))
+    log.info("検証期間の日ごとのレース数: %s", dict(sorted(Counter(k[:10] for k in cache["races"] if args.start <= k[:10] <= args.end).items())))
     day, results = backtest.build_eval_input(cache, start, end)
     log.info("検証するレース: %d（%s〜%s）", len(day["races"]), start, end)
     if not day["races"]:
