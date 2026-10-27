@@ -12,6 +12,8 @@ const { simulate } = window.RaceSim;
 const day = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 // 回数と乱数の固定（バックテストは SIMS=20000 SEED=1 で、何度計算しても同じ印にする）
 const SIMS = +(process.env.SIMS || 5000), SEED = !!process.env.SEED;
+// 重みを変えて比べるとき（keiba tune）は SIM_PARAMS に JSON で渡す
+const PARAMS = process.env.SIM_PARAMS ? JSON.parse(process.env.SIM_PARAMS) : undefined;
 const hash = (s) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
 const results = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 
@@ -65,6 +67,27 @@ function settle(payout, marks) {
   });
 }
 
+// 人気より高く評価している馬（穴）を買っていたら。人気は確定時のもの
+const VALUE = [
+  ["シミュ1位 × 4番人気以下", (rk, pop) => rk === 1 && pop >= 4],
+  ["シミュ3位以内 × 5番人気以下", (rk, pop) => rk <= 3 && pop >= 5],
+  ["シミュ3位以内 × 7番人気以下", (rk, pop) => rk <= 3 && pop >= 7],
+  ["シミュ5位以内 × 8番人気以下", (rk, pop) => rk <= 5 && pop >= 8],
+  ["人気よりシミュが5つ以上上", (rk, pop) => pop - rk >= 5],
+  ["（参考）シミュ1位 × 1〜3番人気", (rk, pop) => rk === 1 && pop <= 3],
+];
+const value = VALUE.map(([name]) => ({ name, n: 0, win: 0, plc: 0, wins: 0, plcs: 0 }));
+const yenOf = (list, num) => (list || []).filter((p) => p.nums.length === 1 && p.nums[0] === num).reduce((a, p) => a + p.yen, 0);
+function spearman(x, y) {
+  const rk = (a) => { const idx = a.map((_, i) => i).sort((p, q) => a[p] - a[q]), r = new Array(a.length);
+    for (let i = 0; i < idx.length;) { let j = i; while (j + 1 < idx.length && a[idx[j + 1]] === a[idx[i]]) j++; for (let k = i; k <= j; k++) r[idx[k]] = (i + j) / 2; i = j + 1; } return r; };
+  const rx = rk(x), ry = rk(y), n = x.length, m = (n - 1) / 2;
+  let a = 0, b = 0, c = 0;
+  for (let i = 0; i < n; i++) { a += (rx[i] - m) * (ry[i] - m); b += (rx[i] - m) ** 2; c += (ry[i] - m) ** 2; }
+  return b && c ? a / Math.sqrt(b * c) : 0;
+}
+const classOf = (c) => /新馬/.test(c) ? "新馬" : /未勝利/.test(c) ? "未勝利" : /1勝/.test(c) ? "1勝クラス" : /2勝/.test(c) ? "2勝クラス" : /3勝/.test(c) ? "3勝クラス" : "オープン・重賞";
+
 const groups = {};
 const raceOut = [];
 // シミュレーションの複勝率が、実際の3着内率と合っているか（複勝率の帯ごと）
@@ -85,7 +108,7 @@ for (const r of day.races) {
   if (!result || !result.length) continue;
   const order = result.map((x) => x.number);
   const res = simulate(Object.assign({ date: day.date }, r), {
-    pedigree: day.pedigree, sims: SIMS, seed: SEED ? hash(key) : undefined,
+    pedigree: day.pedigree, sims: SIMS, seed: SEED ? hash(key) : undefined, params: PARAMS,
     cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "",
       // 発走前までにわかっていた馬場の傾向（keiba evaluate が出す）
       bias: (day.bias_by_race || {})[key] || null },
@@ -102,7 +125,8 @@ for (const r of day.races) {
   const fav = result.find((x) => x.popularity === 1);
   const top3 = order.slice(0, 3);
   const g = ["全体", r.surface || "?", r.race_class && r.race_class.includes("新馬") ? "新馬" : "新馬以外",
-    res.noData + res.byPedigree > horses.length / 3 ? "データ少" : "データ十分"];
+    res.noData + res.byPedigree > horses.length / 3 ? "データ少" : "データ十分", classOf(r.race_class || ""),
+    horses.length <= 10 ? "10頭以下" : horses.length <= 14 ? "11〜14頭" : "15頭以上"];
   add(g, "n", 1);
   add(g, "honWin", pos(marks[0]) === 1 ? 1 : 0);
   add(g, "honTop3", pos(marks[0]) <= 3 ? 1 : 0);
@@ -120,7 +144,24 @@ for (const r of day.races) {
     add(g, "winnerPop", pop(order[0]) || 0);
   }
   add(g, "honPop", pop(marks[0]) || 0);
-  if (day.payouts && day.payouts[key]) settle(day.payouts[key], marks);
+  const pay = day.payouts && day.payouts[key];
+  if (pay) {
+    settle(pay, marks);
+    add(g, "pay", 1);
+    add(g, "honWinYen", yenOf(pay.win, marks[0]));
+    add(g, "honPlcYen", yenOf(pay.place, marks[0]));
+    res.rows.forEach((x, i) => {
+      const pp = pop(x.h.num);
+      if (!pp) return;
+      VALUE.forEach(([, ok], j) => {
+        if (!ok(i + 1, pp)) return;
+        const v = value[j], w = yenOf(pay.win, x.h.num), p = yenOf(pay.place, x.h.num);
+        v.n++; v.win += w; v.plc += p; if (w) v.wins++; if (p) v.plcs++;
+      });
+    });
+  }
+  const fin = res.rows.filter((x) => pos(x.h.num) < 99);
+  if (fin.length >= 4) { add(g, "rhoN", 1); add(g, "rho", spearman(fin.map((_, i) => -i), fin.map((x) => -pos(x.h.num)))); }
   for (const x of res.rows) {
     const c = calib.find((b) => x.top3 >= b.lo && x.top3 < b.hi);
     c.n++; c.pred += x.top3; c.hit += pos(x.h.num) <= 3 ? 1 : 0;
@@ -131,12 +172,14 @@ for (const r of day.races) {
     fav ? `${pos(fav.number)}着` : "-", top3.every((m) => marks.slice(0, 5).includes(m)) ? "的中" : ""].join(" | "));
 }
 
-console.log("\n区分 | レース数 | ◎1着 | ◎3着内 | ○3着内 | 馬連◎○ | 3連複◎○▲ | 3連複 印5頭BOX | 3着内に入った印上位3頭(平均) | 1番人気1着 | 1番人気3着内 | 人気上位5頭BOX | ◎の平均人気 | 勝ち馬の平均人気");
+console.log("\n区分 | レース数 | ◎1着 | ◎3着内 | ○3着内 | 馬連◎○ | 3連複◎○▲ | 3連複 印5頭BOX | 3着内に入った印上位3頭(平均) | 1番人気1着 | 1番人気3着内 | 人気上位5頭BOX | ◎の平均人気 | 勝ち馬の平均人気 | 単勝◎の回収率 | 複勝◎の回収率 | 印の順と着順の順位相関");
 for (const [name, s] of Object.entries(groups)) {
   console.log([name, s.n, rate(s, "honWin"), rate(s, "honTop3"), rate(s, "taiTop3"), rate(s, "umaren"),
     rate(s, "trio3"), rate(s, "trio5"), (s.inTop3 / s.n).toFixed(2),
     s.favN ? `${((100 * s.favWin) / s.favN).toFixed(0)}%` : "-", s.favN ? `${((100 * s.favTop3) / s.favN).toFixed(0)}%` : "-",
-    rate(s, "popTrio5"), (s.honPop / s.n).toFixed(1), (s.winnerPop / s.n).toFixed(1)].join(" | "));
+    rate(s, "popTrio5"), (s.honPop / s.n).toFixed(1), (s.winnerPop / s.n).toFixed(1),
+    s.pay ? `${Math.round((s.honWinYen || 0) / s.pay)}%` : "-", s.pay ? `${Math.round((s.honPlcYen || 0) / s.pay)}%` : "-",
+    s.rhoN ? (s.rho / s.rhoN).toFixed(3) : "-"].join(" | "));
 }
 
 console.log("\nシミュレーションの複勝率 | 頭数 | 予想の平均 | 実際の3着内率");
@@ -149,6 +192,15 @@ if (bets.some((b) => b.races)) {
   for (const b of bets) {
     console.log([b.name, b.races, `${b.cost.toLocaleString()}円`, `${b.ret.toLocaleString()}円`,
       b.cost ? `${Math.round((100 * b.ret) / b.cost)}%` : "-", b.hits].join(" | "));
+  }
+}
+
+if (value.some((v) => v.n)) {
+  console.log("\n穴狙い（該当馬の単勝・複勝を100円ずつ） | 頭数 | 単勝の的中 | 単勝の回収率 | 複勝の的中 | 複勝の回収率");
+  for (const v of value) {
+    if (!v.n) continue;
+    console.log([v.name, v.n, `${Math.round((100 * v.wins) / v.n)}%`, `${Math.round(v.win / v.n)}%`,
+      `${Math.round((100 * v.plcs) / v.n)}%`, `${Math.round(v.plc / v.n)}%`].join(" | "));
   }
 }
 

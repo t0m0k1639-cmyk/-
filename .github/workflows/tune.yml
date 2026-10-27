@@ -1,0 +1,52 @@
+name: 重みの調整
+
+# 控えにある過去のレース結果で、シミュレーションの要素の重みを決めて、調整に使っていない期間で確かめる。
+# JRA にはアクセスしない。ログには集計の数字と決めた重みだけを出す
+on:
+  workflow_dispatch:
+    inputs:
+      train_start:
+        description: "重みを決める期間の最初の日"
+        default: "2025-10-01"
+      train_end:
+        description: "重みを決める期間の最後の日"
+        default: "2026-06-30"
+      test_start:
+        description: "確かめる期間の最初の日"
+        default: "2026-07-01"
+      test_end:
+        description: "確かめる期間の最後の日"
+        default: "2026-10-25"
+      recent_start:
+        description: "直近として別に比べる最初の日（空なら比べない）"
+        default: "2026-10-24"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backtest
+  cancel-in-progress: false
+
+jobs:
+  tune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 重みを決めて確かめる
+        env:
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          A: ${{ inputs.train_start }}
+          B: ${{ inputs.train_end }}
+          C: ${{ inputs.test_start }}
+          D: ${{ inputs.test_end }}
+          R: ${{ inputs.recent_start }}
+        run: python -m keiba tune --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D" $([ -n "$R" ] && echo --recent-start "$R")

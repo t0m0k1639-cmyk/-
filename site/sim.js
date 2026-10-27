@@ -38,10 +38,17 @@
   // 近走の重み。2026/10/24 の35レースの検証で、前走だけの能力の方が着順と合っていたので前走を重く見る
   const REC_W = [1, 0.5, 0.3, 0.2];
   const GOING_LVL = { "良": 0, "稍重": 0.4, "重": 0.8, "不良": 1 };
-  // 同じ検証で上位騎手は着順とやや合っていた（芝で特に）ので、以前より重くする
-  const JK_WEIGHT = { A: 2.5, B: 0, C: -0.5 };
-  // 同じ検証で末脚（走破タイムと上がり3Fの差）は着順とほぼ無関係だったので、効き方を1/4にする
-  const AG_SCALE = 0.25;
+  // 要素ごとの重み。cr・ten・ag・fin はレース内で標準化した値に掛ける（cr を 1 とした比）、
+  // jk・kin・bw は点数（5点で cr の1標準偏差）に掛ける。noise は揺らぎの大きさ（点数差の何倍か）。
+  // opts.params で上書きできる（keiba/tune.js が過去のレースで重みを決めるときに使う）
+  const PARAMS = {
+    cr: 1, ten: 0.4, ag: 0.1, fin: 0,   // 能力・位置取り・末脚・近走の着順
+    jk: 2.5,                            // 上位騎手
+    kin: -0.9,                          // 斤量 1kg あたり（1600m基準。負なら重いほど不利）
+    bw: 1,                              // 馬体重の増減の減点
+    post: 0,                            // 内枠（コースごとの枠の有利不利に足す）
+    noise: 1.2,
+  };
   // 開催中の馬場の傾向（keiba/bias.py）の効かせ方。front・inner は「ふつうとの差」（0.1 でかなり強い傾向）
   const BIAS_FRONT = 3, BIAS_POST = 2;
   // 調教評価と脚色（以前のシミュレーターと同じ点数）。JRA公式には調教のデータがないので、自分で入れる
@@ -182,7 +189,7 @@
     const surf = cfg.surface === "turf" ? "芝" : "ダ";
     const notes = [];
     let posS = 0, posW = 0, kickS = 0, kickW = 0, abS = 0, abW = 0, used = 0, sameUsed = 0;
-    let gS = 0, gW = 0, wS = 0, wW = 0;
+    let gS = 0, gW = 0, wS = 0, wW = 0, finS = 0, finW = 0;
     const skipped = [], discounted = [];
     const past = (h.past || []).slice(0, 4);
     past.forEach((p, k) => {
@@ -197,6 +204,7 @@
       const sec = toSec(p.time), dist = p.distance, l3 = p.last3f;
       if (!other && sec && dist && Number.isFinite(l3)) { kickS += w * (sec / dist * 600 - l3); kickW += w; }
       const base = classBase(cls), rank = typeof p.place === "number" ? p.place : NaN;
+      if (Number.isFinite(rank) && p.heads > 1) { finS += w * (1 - (Math.min(rank, p.heads) - 1) / (p.heads - 1)); finW += w; }
       if (base !== null && Number.isFinite(rank)) {
         let sc = base - 6 * Math.min(Number.isFinite(p.margin) ? p.margin : 1.5, 3) - (other ? 3 : 0);
         if (p.venue === cfg.venue && Math.abs(dist - cfg.dist) <= 200 && rank <= 3) sc += 1.5;
@@ -246,7 +254,7 @@
     if (ref && h.jockey && ref.jockey && nospace(h.jockey) !== nospace(ref.jockey)) notes.push("乗り替わり");
     if (ref && ref.distance && Math.abs(cfg.dist - ref.distance) >= 200) notes.push(`距離${cfg.dist > ref.distance ? "延長" : "短縮"}${Math.abs(cfg.dist - ref.distance)}m`);
     return {
-      num: h.number, name: h.name, waku: h.waku, cr: ab, ten: pos === null ? null : -pos, ag,
+      num: h.number, name: h.name, waku: h.waku, cr: ab, ten: pos === null ? null : -pos, ag, fin: finW ? finS / finW : null,
       style, notes, pos, wetDiff, wetN, kinDiff, kin: Number.isFinite(h.weight) ? h.weight : null, jkRank: jockeyRank(h.jockey),
       aptAdj, byPedigree, bwAdj,
     };
@@ -262,38 +270,50 @@
     return { pace, nige, sen };
   }
 
-  function buildModel(hs, c) {
-    const n = hs.length;
+  // 1頭ずつの要素（重みを掛ける前）。base = fixed + Σ P[要素] × 要素
+  const TERMS = ["cr", "ten", "ag", "fin", "jk", "kin", "bw", "post"];
+  function terms(hs, c) {
     const cr = zscore(hs.map((h) => h.cr)), ten = zscore(hs.map((h) => h.ten)), ag = zscore(hs.map((h) => h.ag));
-    const ge = goingEffect(c);
+    const fin = zscore(hs.map((h) => (h.fin == null ? null : h.fin)));
+    const ge = goingEffect(c), ce = courseEffect(c);
     const kins = hs.map((h) => h.kin).filter(Number.isFinite);
     const kinMean = kins.length >= Math.ceil(hs.length / 2) ? kins.reduce((a, b) => a + b, 0) / kins.length : null;
-    const perKg = 0.9 * clamp(c.dist / 1600, 0.75, 1.4); // 1kg≒0.15秒（1600m基準・距離が長いほど大きく）
-    const extra = hs.map((h) => {
-      const kinTerm = (kinMean != null && Number.isFinite(h.kin)) ? -perKg * (h.kin - kinMean) : -0.9 * (h.kinDiff || 0);
-      let p = kinTerm + (JK_WEIGHT[h.jkRank] || 0) + 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (h.bwAdj || 0)
-        + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0);
+    const distK = clamp(c.dist / 1600, 0.75, 1.4); // 距離が長いほど斤量の差が効く
+    const pace = c.pace === "auto" ? autoPace(hs).pace : c.pace;
+    const agMul = { S: 0.75, M: 1, H: 1.3 }[pace];
+    const k = [0, 0.2, 0.4, 0.65][+c.strength];
+    const postSign = { in: 1, flat: 0, out: -1 }[c.post];
+    const bias = c.bias || {};
+    const biasPost = clamp(BIAS_POST * (bias.inner || 0), -0.3, 0.3);
+    const rows = hs.map((h, i) => {
+      let p = 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0);
       if (ge.lvl && h.wetDiff != null) {
         // 道悪での成績が良のときより良いか悪いか（走った回数が少ないうちは弱める）
         const wet = ge.lvl * clamp(h.wetDiff, -6, 6) * 1.2 * (h.wetN / (h.wetN + 1.5));
         p += wet;
         if (Math.abs(wet) >= 1) h.notes.unshift(wet > 0 ? "道悪巧者で加点" : "道悪苦手で減点");
       }
-      return p / 5;
+      const inner = 1 - 2 * h.gate;
+      return {
+        fixed: p / 5 + (postSign * k + ce.post + biasPost) * inner,
+        cr: ce.crMul * cr[i], ten: ce.tenMul * ge.tenMul * ten[i], ag: agMul * ce.agMul * ge.agMul * ag[i], fin: fin[i],
+        jk: h.jkRank === "A" ? 0.2 : 0,
+        kin: ((kinMean != null && Number.isFinite(h.kin)) ? distK * (h.kin - kinMean) : (h.kinDiff || 0)) / 5,
+        bw: (h.bwAdj || 0) / 5, post: inner,
+      };
     });
-    const pace = c.pace === "auto" ? autoPace(hs).pace : c.pace;
+    return { rows, ge, ce, pace, bias };
+  }
+
+  function buildModel(hs, c, P = PARAMS) {
+    const n = hs.length;
+    const { rows, ge, ce, pace, bias } = terms(hs, c);
+    const ten = zscore(hs.map((h) => h.ten));
     const paceFront = { S: 0.3, M: 0, H: -0.3 }[pace];
-    const agMul = { S: 0.75, M: 1, H: 1.3 }[pace];
     const k = [0, 0.2, 0.4, 0.65][+c.strength];
-    const noiseR = { low: 0.9, mid: 1.2, high: 1.55 }[c.chaos] + ge.sigma;
-    const t = c.weight / 100;
-    const ce = courseEffect(c);
-    const wTen = (0.15 + 0.5 * (1 - t)) * ce.tenMul * ge.tenMul, wAg = AG_SCALE * (0.15 + 0.5 * t) * agMul * ce.agMul * ge.agMul;
-    const postSign = { in: 1, flat: 0, out: -1 }[c.post];
     const styleSign = { front: 1, flat: 0, back: -1 }[c.style];
-    const bias = c.bias || {};
-    const biasPost = clamp(BIAS_POST * (bias.inner || 0), -0.3, 0.3);
-    const base = hs.map((h, i) => extra[i] + ce.crMul * cr[i] + wTen * ten[i] + wAg * ag[i] + (postSign * k + ce.post + biasPost) * (1 - 2 * h.gate));
+    const noiseR = P.noise + ge.sigma;
+    const base = rows.map((r) => TERMS.reduce((a, t) => a + P[t] * r[t], r.fixed));
     const early = hs.map((h, i) => ten[i] * 0.7 + STYLE_FRONT[h.style] * 1.5);
     const frontK = paceFront + styleSign * k + ce.front + ge.front + clamp(BIAS_FRONT * (bias.front || 0), -0.4, 0.4);
     // 揺らぎは馬ごとの点数差の大きさに比例させる（補正を重ねても勝率が極端にならないように）
@@ -338,7 +358,8 @@
     });
     const noData = hs.filter((h) => h.cr === null && h.ten === null && h.ag === null).length;
     const byPedigree = hs.filter((h) => h.byPedigree).length;
-    const m = buildModel(hs, cfg), N = opts.sims || 5000;
+    const P = Object.assign({}, PARAMS, opts.params || {});
+    const m = buildModel(hs, cfg, P), N = opts.sims || 5000;
     const win = new Array(n).fill(0), top2 = new Array(n).fill(0), top3 = new Array(n).fill(0), sumR = new Array(n).fill(0);
     for (let s = 0; s < N; s++) {
       const fRank = runOne(m);
@@ -362,5 +383,5 @@
   }
 
   // _internal は成績の検証用（keiba/diag_sim.js）
-  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS, _internal: { features, buildModel, configFor, classBase, toSec } };
+  window.RaceSim = { simulate, pedStats, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
 })();

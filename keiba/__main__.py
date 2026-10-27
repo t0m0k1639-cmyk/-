@@ -368,6 +368,46 @@ def cmd_backtest(args) -> int:
     return 0
 
 
+def _node(js: str, day: dict, results: dict, **env) -> str:
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "day.json").write_text(json.dumps(day, ensure_ascii=False))
+        (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))
+        return subprocess.run(["node", str(ROOT / "keiba" / js), f"{tmp}/day.json", f"{tmp}/res.json"],
+                              capture_output=True, text=True, check=True, env=dict(os.environ, **env)).stdout
+
+
+def cmd_tune(args) -> int:
+    """控えにある過去のレースで重みを決め（keiba/tune.js）、調整に使っていない期間で今の重みと比べる。数字だけを出す。"""
+    password = page_password()
+    if not password:
+        log.error("パスワードがありません")
+        return 2
+    cache = backtest.load_cache(Path(args.data), password)
+    d = date.fromisoformat
+    train = backtest.build_eval_input(cache, d(args.train_start), d(args.train_end))
+    test = backtest.build_eval_input(cache, d(args.test_start), d(args.test_end))
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for name, (day, res) in (("train", train), ("test", test)):
+            for suffix, obj in (("day", day), ("res", res)):
+                (Path(tmp) / f"{name}_{suffix}.json").write_text(json.dumps(obj, ensure_ascii=False))
+                paths.append(f"{tmp}/{name}_{suffix}.json")
+        out = subprocess.run(["node", str(ROOT / "keiba" / "tune.js"), *paths], capture_output=True, text=True, check=True,
+                             env=dict(os.environ, TUNE_SIMS=str(args.tune_sims))).stdout
+    print(out)
+    params = next(l[len("PARAMS "):] for l in out.splitlines() if l.startswith("PARAMS "))
+    only_totals = lambda text: "\n".join(l for l in text.splitlines() if not re.match(r"\d{4}-\d{2}-\d{2}\|", l))
+    runs = [("確認用の期間・今の重み", test, {}), ("確認用の期間・調整後", test, {"SIM_PARAMS": params}),
+            ("調整用の期間・調整後", train, {"SIM_PARAMS": params})]
+    if args.recent_start:
+        recent = backtest.build_eval_input(cache, d(args.recent_start), d(args.test_end))
+        runs += [("直近・今の重み", recent, {}), ("直近・調整後", recent, {"SIM_PARAMS": params})]
+    for title, (day, res), env in runs:
+        print(f"\n===== {title}（{len(day['races'])}レース） =====")
+        print(only_totals(_node("eval_sim.js", day, res, SIMS=str(args.sims), SEED="1", **env)))
+    return 0
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="keiba")
@@ -391,13 +431,22 @@ def main(argv=None) -> int:
     bt.add_argument("--sims", type=int, default=20000)
     bt.add_argument("--eval-only", action="store_true", help="控えにあるレースだけで比べる（JRAにアクセスしない）")
     bt.add_argument("--data", default=str(ROOT / "data"))
+    tu = sub.add_parser("tune")
+    tu.add_argument("--train-start", required=True)
+    tu.add_argument("--train-end", required=True)
+    tu.add_argument("--test-start", required=True)
+    tu.add_argument("--test-end", required=True)
+    tu.add_argument("--recent-start", help="この日から --test-end までも別に比べる（先週など）")
+    tu.add_argument("--sims", type=int, default=10000)
+    tu.add_argument("--tune-sims", type=int, default=2000)
+    tu.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "sample": cmd_sample,
+    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "tune": cmd_tune, "sample": cmd_sample,
             "build-site": cmd_build_site}[args.cmd](args)
 
 
