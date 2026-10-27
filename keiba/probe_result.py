@@ -40,10 +40,11 @@ def main() -> None:
     a = soup.select_one("th.race_num a[href]")
     res = jra._open(f, parse.Link(a["href"], None, ""))
     rs = parse.BeautifulSoup(res, "html.parser")
-    for t in rs.select("table"):
-        print("\n表の class:", t.get("class"), "行数:", len(t.select("tr")))
-        for r in t.select("tr")[:3]:
-            print("行:", masked(str(r), 2000))
+    # 払戻金の欄（class に refund / pay / harai を含む要素）
+    import re
+    for el in rs.find_all(class_=re.compile(r"refund|pay|harai", re.I))[:3]:
+        print("\n払戻の要素:", el.name, el.get("class"))
+        print(masked(str(el), 6000))
 
 
 if __name__ == "__main__":
