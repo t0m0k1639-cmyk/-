@@ -156,10 +156,11 @@ def merge_going(races: list[Race], going: dict, baba: dict | None = None) -> Non
             r.baba_time = b.get("cushion_time") or b.get("moist_time")
 
 
-def collect_results(f: Fetcher, today: date, want=None) -> dict[str, list[dict]]:
+def collect_results(f: Fetcher, today: date, want=None, payouts: dict | None = None) -> dict[str, list[dict]]:
     """当日のレースの着順を {"東京-11": [{place, number, popularity, corners}, ...]} で返す。
 
     want を渡すと、want("東京-11") が真のレースだけ結果ページを開く（取得済みや発走前を飛ばす）。
+    payouts に辞書を渡すと、払戻金（parse.parse_payouts）も同じページから読んで入れる。
     """
     home = parse.extract_actions(f.get("/"))
     entry = next(((a.path, a.cname) for a in home if a.path.endswith("accessS.html") and "pw01sli" in a.cname),
@@ -172,7 +173,10 @@ def collect_results(f: Fetcher, today: date, want=None) -> dict[str, list[dict]]
             if not row.race_link or (want and not want(f"{venue}-{row.fields['number']}")):
                 continue
             try:
-                res = parse.parse_result(_open(f, row.race_link))
+                html = _open(f, row.race_link)
+                res = parse.parse_result(html)
+                if payouts is not None:
+                    payouts[f"{venue}-{row.fields['number']}"] = parse.parse_payouts(html)
             except Exception as e:
                 log.warning("%s%dR の結果を読めませんでした: %s", venue, row.fields["number"], e)
                 continue

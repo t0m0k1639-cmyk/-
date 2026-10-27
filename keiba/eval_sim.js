@@ -12,6 +12,43 @@ const { simulate } = window.RaceSim;
 const day = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const results = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 
+// シミュレーションの印どおりに100円ずつ買っていたら（払戻金は day.payouts。keiba evaluate が入れる）
+const pairs = (xs) => xs.flatMap((a, i) => xs.slice(i + 1).map((b) => [a, b]));
+const triples = (xs) => xs.flatMap((a, i) => pairs(xs.slice(i + 1)).map((p) => [a, ...p]));
+const perms3 = (xs) => xs.flatMap((a) => xs.filter((b) => b !== a).flatMap((b) => xs.filter((c) => c !== a && c !== b).map((c) => [a, b, c])));
+const BETS = [
+  ["単勝 ◎", "win", (m) => [[m[0]]]],
+  ["単勝 ○", "win", (m) => [[m[1]]]],
+  ["単勝 ▲", "win", (m) => [[m[2]]]],
+  ["単勝 ◎○▲（3点）", "win", (m) => [[m[0]], [m[1]], [m[2]]]],
+  ["複勝 ◎", "place", (m) => [[m[0]]]],
+  ["複勝 ◎○▲（3点）", "place", (m) => [[m[0]], [m[1]], [m[2]]]],
+  ["馬連 ◎-○", "umaren", (m) => [[m[0], m[1]]]],
+  ["馬連ボックス ◎○▲（3点）", "umaren", (m) => pairs(m.slice(0, 3))],
+  ["ワイド ◎-○", "wide", (m) => [[m[0], m[1]]]],
+  ["ワイドボックス ◎○▲（3点）", "wide", (m) => pairs(m.slice(0, 3))],
+  ["3連複 ◎○▲", "trio", (m) => [m.slice(0, 3)]],
+  ["3連複 印5頭ボックス（10点）", "trio", (m) => triples(m.slice(0, 5))],
+  ["3連単 ◎○▲ボックス（6点）", "tierce", (m) => perms3(m.slice(0, 3))],
+];
+const ORDERED = new Set(["tierce", "umatan"]);
+const sameSet = (a, b) => a.length === b.length && [...a].sort((x, y) => x - y).every((v, i) => v === [...b].sort((x, y) => x - y)[i]);
+const bets = BETS.map(([name]) => ({ name, cost: 0, ret: 0, hits: 0, races: 0 }));
+function settle(payout, marks) {
+  BETS.forEach(([, kind, make], i) => {
+    const tickets = make(marks).filter((t) => t.every((n) => n != null));
+    if (!tickets.length) return;
+    let ret = 0;
+    for (const t of tickets) {
+      for (const p of payout[kind] || []) {
+        if (ORDERED.has(kind) ? p.nums.join("-") === t.join("-") : sameSet(p.nums, t)) ret += p.yen;
+      }
+    }
+    const b = bets[i];
+    b.cost += 100 * tickets.length; b.ret += ret; b.races++; if (ret) b.hits++;
+  });
+}
+
 const groups = {};
 const raceOut = [];
 // シミュレーションの複勝率が、実際の3着内率と合っているか（複勝率の帯ごと）
@@ -67,6 +104,7 @@ for (const r of day.races) {
     add(g, "winnerPop", pop(order[0]) || 0);
   }
   add(g, "honPop", pop(marks[0]) || 0);
+  if (day.payouts && day.payouts[key]) settle(day.payouts[key], marks);
   for (const x of res.rows) {
     const c = calib.find((b) => x.top3 >= b.lo && x.top3 < b.hi);
     c.n++; c.pred += x.top3; c.hit += pos(x.h.num) <= 3 ? 1 : 0;
@@ -90,6 +128,14 @@ for (const c of calib) {
   if (c.n) console.log([`${c.lo * 100}〜${Math.min(c.hi, 1) * 100}%`, c.n, `${((100 * c.pred) / c.n).toFixed(0)}%`, `${((100 * c.hit) / c.n).toFixed(0)}%`].join(" | "));
 }
 
+if (bets.some((b) => b.races)) {
+  console.log("\n買い方（100円ずつ） | レース数 | 投資 | 払戻 | 回収率 | 的中レース");
+  for (const b of bets) {
+    console.log([b.name, b.races, `${b.cost.toLocaleString()}円`, `${b.ret.toLocaleString()}円`,
+      b.cost ? `${Math.round((100 * b.ret) / b.cost)}%` : "-", b.hits].join(" | "));
+  }
+}
+
 if (process.argv[4]) {
-  fs.writeFileSync(process.argv[4], JSON.stringify({ races: raceOut, groups, calib }));
+  fs.writeFileSync(process.argv[4], JSON.stringify({ races: raceOut, groups, calib, bets: bets.filter((b) => b.races) }));
 }

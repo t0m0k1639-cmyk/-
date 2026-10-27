@@ -265,3 +265,19 @@ def test_parse_result():
         {"place": 1, "number": 12, "popularity": 1, "corners": [6, 5]},
         {"place": 2, "number": 8, "popularity": 3, "corners": []},
     ]
+
+
+def test_parse_payouts():
+    html = """<div class="refund_unit"><ul>
+    <li class="win"><dl><dd><div class="line"><div class="num">16</div><div class="yen">990<span>円</span></div></div></dd></dl></li>
+    <li class="place"><dl><dd>
+      <div class="line"><div class="num">16</div><div class="yen">320円</div></div>
+      <div class="line"><div class="num">13</div><div class="yen">180円</div></div></dd></dl></li>
+    <li class="wide"><dl><dd><div class="line"><div class="num">11-16</div><div class="yen">1,750円</div></div></dd></dl></li>
+    <li class="tierce"><dl><dd><div class="line"><div class="num">16-13-11</div><div class="yen">40,860円</div></div></dd></dl></li>
+    </ul></div>"""
+    p = parse.parse_payouts(html)
+    assert p["win"] == [{"nums": [16], "yen": 990}]
+    assert [x["yen"] for x in p["place"]] == [320, 180]
+    assert p["wide"] == [{"nums": [11, 16], "yen": 1750}]
+    assert p["tierce"] == [{"nums": [16, 13, 11], "yen": 40860}]

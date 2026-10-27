@@ -539,3 +539,26 @@ def parse_result(html: str) -> list[dict]:
             "corners": [int(t) for t in (_text(li) for li in corner.select("li")) if t.isdigit()] if corner else [],
         })
     return sorted(rows, key=lambda r: r["place"])
+
+
+PAYOUT_KINDS = ("win", "place", "wakuren", "wide", "umaren", "umatan", "trio", "tierce")
+
+
+def parse_payouts(html: str) -> dict[str, list[dict]]:
+    """結果ページの払戻金（div.refund_unit の li.win / place / umaren / wide / trio / tierce など）を読む。
+
+    {"win": [{"nums": [16], "yen": 990}], "wide": [{"nums": [13, 16], "yen": 520}, ...], ...}（100円あたり）
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    unit = soup.select_one(".refund_unit")
+    out: dict[str, list[dict]] = {}
+    if unit is None:
+        return out
+    for kind in PAYOUT_KINDS:
+        for line in unit.select(f"li.{kind} .line"):
+            num, yen = line.find(class_="num"), line.find(class_="yen")
+            nums = [int(x) for x in re.findall(r"\d+", _text(num))] if num else []
+            amount = _digits(_text(yen)) if yen else None
+            if nums and amount:
+                out.setdefault(kind, []).append({"nums": nums, "yen": amount})
+    return out

@@ -451,3 +451,4 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .batch-btns button:disabled { opacity: 0.5; cursor: default; }
 .batch-msg { font-size: var(--step--1); color: var(--muted); }
 .batch-msg:empty { display: none; }
+.rv-table tr.rv-plus th, .rv-table tr.rv-plus td { color: var(--hon); font-weight: 700; }

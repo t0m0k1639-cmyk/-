@@ -734,6 +734,19 @@
         el("td", "", pct(c.pred, c.n)), el("td", "", pct(c.hit, c.n)));
       cal.append(tr);
     }
+    // シミュレーションの印どおりに100円ずつ買っていたら（払戻金が取れた日だけ）
+    const betTable = el("table", "rv-table");
+    if (rv.bets && rv.bets.length) {
+      const bh = el("tr");
+      bh.append(el("th", "", "100円ずつ買っていたら"), el("th", "", "投資"), el("th", "", "払戻"), el("th", "", "回収率"));
+      betTable.append(bh);
+      for (const b of rv.bets) {
+        const tr = el("tr", b.ret >= b.cost ? "rv-plus" : "");
+        tr.append(el("th", "", `${b.name}（${b.hits}/${b.races}R的中）`), el("td", "", `${b.cost.toLocaleString()}円`),
+          el("td", "", `${b.ret.toLocaleString()}円`), el("td", "", b.cost ? `${Math.round((100 * b.ret) / b.cost)}%` : "—"));
+        betTable.append(tr);
+      }
+    }
     box.replaceChildren(
       el("h2", "eyebrow", "予想と結果"),
       el("p", "rv-meta", `${fmtTime(rv.evaluated_at)} に JRA公式サイトの着順と比べました。シミュレーションはレース後に同じ計算で出し直したもので、自分の補正・調教・手で入れた馬場は入っていません。`),
@@ -741,6 +754,7 @@
       ...lines.map((t) => el("p", "rv-line", t)),
       el("p", "rv-sub", "シミュレーションの複勝率は当てになるか（予想の平均と実際が近いほど信頼できる）"),
       cal,
+      ...(rv.bets && rv.bets.length ? [el("p", "rv-sub", "シミュレーションの印どおりに100円ずつ買っていたら（JRA公式サイトの払戻金）"), betTable] : []),
     );
   }
 

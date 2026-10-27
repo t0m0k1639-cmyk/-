@@ -281,8 +281,10 @@ def cmd_evaluate(args) -> int:
         return 0
     saved = decrypt(json.loads(path.read_text()), password)
     f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
-    results = jra.collect_results(f, day)
+    payouts: dict = {}
+    results = jra.collect_results(f, day, payouts=payouts)
     log.info("結果を取得: %d レース", len(results))
+    saved["payouts"] = payouts
     if results:
         # 翌日の馬場の傾向に使う控え
         bias.save_raw(data_dir, day, password, results)
