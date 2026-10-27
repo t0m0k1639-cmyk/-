@@ -7,7 +7,7 @@ on:
         description: "対象日 YYYY-MM-DD"
         required: true
       kind:
-        description: "調べるもの（all / result / site / check）"
+        description: "調べるもの（all / result / site / check / past）"
         required: false
         default: "all"
 
@@ -39,6 +39,10 @@ jobs:
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
         run: python -m keiba.check_day --date "$TARGET_DATE" --race "新潟-8"
+      - if: inputs.kind == 'past'
+        env:
+          KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+        run: python -m keiba.probe_past
       - if: inputs.kind == 'result'
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
