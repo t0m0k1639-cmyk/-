@@ -281,3 +281,12 @@ def test_parse_payouts():
     assert [x["yen"] for x in p["place"]] == [320, 180]
     assert p["wide"] == [{"nums": [11, 16], "yen": 1750}]
     assert p["tierce"] == [{"nums": [16, 13, 11], "yen": 40860}]
+
+
+def test_parse_odds_table():
+    from keiba.parse import parse_odds_table
+    html = """<table><tr><th>枠</th><th>馬番</th></tr>
+    <tr><td class="waku"><img alt="枠1"/></td><td class="num">1</td><td class="horse">ウマA</td><td class="odds_tan">12.5</td><td class="odds_fuku">2.1 - 3.4</td></tr>
+    <tr><td class="waku"><img alt="枠2"/></td><td class="num">2</td><td class="horse">ウマB</td><td class="odds_tan">1,234.0</td><td class="odds_fuku">45.0-120.3</td></tr>
+    <tr><td class="waku"><img alt="枠3"/></td><td class="num">3</td><td class="horse">ウマC</td><td>取消</td><td></td></tr></table>"""
+    assert parse_odds_table(html) == {1: {"win": 12.5, "place": [2.1, 3.4]}, 2: {"win": 1234.0, "place": [45.0, 120.3]}}

@@ -5,7 +5,8 @@ from keiba import backtest
 DAY = """<table><tr><th class="race_num">レース</th></tr>
 <tr><th class="race_num"><a href="/JRADB/accessS.html?CNAME=pw01sde1005202604090120261025/A4"><img alt="1レース"/></a></th>
 <td class="race_name"><div><div> 2歳未勝利（混合）[指定]</div></div></td>
-<td class="dist">1,600<span>メートル</span></td><td class="course">ダート</td><td class="num">16<span>頭</span></td></tr>
+<td class="dist">1,600<span>メートル</span></td><td class="course">ダート</td><td class="num">16<span>頭</span></td>
+<td class="odds"><a href="#" onclick="return doAction('/JRADB/accessO.html', 'pw151ou1005202604090120261025Z/E6');"><img alt="1レースオッズ"/></a></td></tr>
 </table>"""
 
 RESULT = """<table>
@@ -29,7 +30,9 @@ RESULT = """<table>
 def test_parse_result_day_rows():
     rows = backtest.parse_result_day_rows(DAY)
     assert rows == [{"number": 1, "name": "2歳未勝利(混合)[指定]", "race_class": "未勝利", "surface": "ダート",
-                     "distance": 1600, "link": "/JRADB/accessS.html?CNAME=pw01sde1005202604090120261025/A4"}]
+                     "distance": 1600, "link": "/JRADB/accessS.html?CNAME=pw01sde1005202604090120261025/A4",
+                     "odds_link": rows[0]["odds_link"]}]
+    assert (rows[0]["odds_link"].path, rows[0]["odds_link"].cname) == ("/JRADB/accessO.html", "pw151ou1005202604090120261025Z/E6")
 
 
 def test_parse_result_runners():
