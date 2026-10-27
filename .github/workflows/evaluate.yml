@@ -12,6 +12,10 @@ on:
       date:
         description: "対象日 YYYY-MM-DD（空なら今日）"
         required: false
+      dry_run:
+        description: "集計をログに出すだけ（ページは変えない）"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -44,7 +48,8 @@ jobs:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
-        run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"} $([ "$DRY_RUN" = "true" ] && echo --dry-run)
       - name: data/ をコミット
         id: commit
         if: steps.run.outputs.updated == 'true'

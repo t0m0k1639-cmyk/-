@@ -285,7 +285,7 @@ def cmd_evaluate(args) -> int:
     results = jra.collect_results(f, day, payouts=payouts)
     log.info("結果を取得: %d レース", len(results))
     saved["payouts"] = payouts
-    if results:
+    if results and not args.dry_run:
         # 翌日の馬場の傾向に使う控え
         bias.save_raw(data_dir, day, password, results)
     # 検証では、各レースの発走前までにわかっていた傾向だけを使う（後のレースの結果を混ぜない）
@@ -308,8 +308,9 @@ def cmd_evaluate(args) -> int:
             for js in ("eval_sim.js", "diag_sim.js"))
         page = json.loads((Path(tmp) / "page.json").read_text())
     print(out)
-    if not results:
-        log.warning("結果がまだありません")
+    if not results or args.dry_run:
+        if not results:
+            log.warning("結果がまだありません")
         set_output("updated", "false")
         return 0
     # ページで見る用。着順と予想印を含むので、出馬表と同じく暗号化して置く
@@ -337,6 +338,7 @@ def main(argv=None) -> int:
     e = sub.add_parser("evaluate")
     e.add_argument("--date")
     e.add_argument("--data", default=str(ROOT / "data"))
+    e.add_argument("--dry-run", action="store_true", help="集計をログに出すだけで、data/ には書かない")
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")

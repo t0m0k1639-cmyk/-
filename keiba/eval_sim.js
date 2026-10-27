@@ -30,6 +30,19 @@ const BETS = [
   ["3連複 ◎○▲", "trio", (m) => [m.slice(0, 3)]],
   ["3連複 印5頭ボックス（10点）", "trio", (m) => triples(m.slice(0, 5))],
   ["3連単 ◎○▲ボックス（6点）", "tierce", (m) => perms3(m.slice(0, 3))],
+  // ☆・△まで（印の上位5頭）
+  ["単勝 ☆", "win", (m) => [[m[3]]]],
+  ["単勝 △", "win", (m) => [[m[4]]]],
+  ["単勝 印5頭（5点）", "win", (m) => m.slice(0, 5).map((n) => [n])],
+  ["複勝 ☆", "place", (m) => [[m[3]]]],
+  ["複勝 △", "place", (m) => [[m[4]]]],
+  ["複勝 印5頭（5点）", "place", (m) => m.slice(0, 5).map((n) => [n])],
+  ["馬連 ◎流し→○▲☆△（4点）", "umaren", (m) => m.slice(1, 5).map((n) => [m[0], n])],
+  ["馬連ボックス 印5頭（10点）", "umaren", (m) => pairs(m.slice(0, 5))],
+  ["ワイド ◎流し→○▲☆△（4点）", "wide", (m) => m.slice(1, 5).map((n) => [m[0], n])],
+  ["ワイドボックス 印5頭（10点）", "wide", (m) => pairs(m.slice(0, 5))],
+  ["3連複 ◎軸→○▲☆△（6点）", "trio", (m) => pairs(m.slice(1, 5)).map((p) => [m[0], ...p])],
+  ["3連単 印5頭ボックス（60点）", "tierce", (m) => perms3(m.slice(0, 5))],
 ];
 const ORDERED = new Set(["tierce", "umatan"]);
 const sameSet = (a, b) => a.length === b.length && [...a].sort((x, y) => x - y).every((v, i) => v === [...b].sort((x, y) => x - y)[i]);
