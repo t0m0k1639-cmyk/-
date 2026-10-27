@@ -166,7 +166,9 @@ for (const r of day.races) {
   }
   add(g, "honPop", pop(marks[0]) || 0);
   const pay = day.payouts && day.payouts[key];
-  if (pay) {
+  // 新馬戦は前走のデータがなく当たり外れが大きいので、払戻の集計（買い方・穴狙い・期待値）からは外す
+  const newcomer = (r.race_class || "").includes("新馬");
+  if (pay && !newcomer) {
     settle(pay, marks);
     add(g, "pay", 1);
     add(g, "honWinYen", yenOf(pay.win, marks[0]));
@@ -227,7 +229,7 @@ for (const c of calib) {
 }
 
 if (bets.some((b) => b.races)) {
-  console.log("\n買い方（100円ずつ） | レース数 | 投資 | 払戻 | 回収率 | 的中レース");
+  console.log("\n買い方（100円ずつ・新馬戦を除く） | レース数 | 投資 | 払戻 | 回収率 | 的中レース");
   for (const b of bets) {
     console.log([b.name, b.races, `${b.cost.toLocaleString()}円`, `${b.ret.toLocaleString()}円`,
       b.cost ? `${Math.round((100 * b.ret) / b.cost)}%` : "-", b.hits].join(" | "));
@@ -235,7 +237,7 @@ if (bets.some((b) => b.races)) {
 }
 
 if (value.some((v) => v.n)) {
-  console.log("\n穴狙い（該当馬の単勝・複勝を100円ずつ） | 頭数 | 単勝の的中 | 単勝の回収率 | 複勝の的中 | 複勝の回収率");
+  console.log("\n穴狙い（該当馬の単勝・複勝を100円ずつ・新馬戦を除く） | 頭数 | 単勝の的中 | 単勝の回収率 | 複勝の的中 | 複勝の回収率");
   for (const v of value) {
     if (!v.n) continue;
     console.log([v.name, v.n, `${Math.round((100 * v.wins) / v.n)}%`, `${Math.round(v.win / v.n)}%`,
@@ -244,7 +246,7 @@ if (value.some((v) => v.n)) {
 }
 
 if (ev.some((e) => e.n)) {
-  console.log(`\n期待値で買う（確定オッズ・100円ずつ・${days.size}日） | 買った頭数 | 1日あたり | 的中率 | 回収率`);
+  console.log(`\n期待値で買う（確定オッズ・100円ずつ・新馬戦を除く・${days.size}日） | 買った頭数 | 1日あたり | 的中率 | 回収率`);
   for (const e of ev) {
     if (!e.n) continue;
     console.log([e.name, e.n, (e.n / days.size).toFixed(1), `${Math.round((100 * e.hit) / e.n)}%`, `${Math.round(e.ret / e.n)}%`].join(" | "));
