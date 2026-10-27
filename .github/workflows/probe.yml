@@ -42,7 +42,7 @@ jobs:
       - if: inputs.kind == 'past'
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
-        run: python -m keiba.probe_past
+        run: python -m keiba.probe_past --month 2026-09 --date 2026-10-25
       - if: inputs.kind == 'result'
         env:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
