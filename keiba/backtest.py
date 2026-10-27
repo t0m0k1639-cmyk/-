@@ -138,7 +138,11 @@ def crawl(f: Fetcher, cache: dict, start: date, end: date) -> int:
         if not code:
             log.warning("%d年%d月のコードがありません", y, m)
         else:
-            for d, venue, act in day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl10{y}{m:02d}/{code}")):
+            # 過去の月は pw01skl10、今月は pw01skl00 のページに開催日の一覧がある
+            days = day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl10{y}{m:02d}/{code}"))
+            if not days:
+                days = day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl00{y}{m:02d}/{code}"))
+            for d, venue, act in days:
                 if not (start <= d <= end) or f"{d}|{venue}" in cache["days"]:
                     continue
                 try:
