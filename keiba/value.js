@@ -132,9 +132,15 @@ console.log("\n勝ち馬の当てはまり（大きいほど良い） | 調整�
 for (const [name, th] of [["オッズだけ", thMkt], ["シミュだけ", thSim], ["オッズ＋シミュ", thMix]]) {
   console.log([name, loglik(dTrain, th).ll.toFixed(4), loglik(dTest, th).ll.toFixed(4), th.map((v) => v.toFixed(3)).join(", ")].join(" | "));
 }
-console.log("\n買い方（100円ずつ） | 調整用：頭数・的中・回収率 | 確認用：頭数・的中・回収率");
-const a = backtest(dTrain, thMix), b = backtest(dTest, thMix);
-RULES.forEach(([kind, name], j) => {
-  const f = (s) => s.n ? `${s.n}頭・${Math.round((100 * s.hit) / s.n)}%・${Math.round(s.ret / s.n)}%` : "-";
-  console.log([`${kind} ${name}`, f(a[j]), f(b[j])].join(" | "));
-});
+const f = (s) => s.n ? `${s.n}頭・${Math.round((100 * s.hit) / s.n)}%・${Math.round(s.ret / s.n)}%` : "-";
+for (const [title, th] of [["オッズ＋シミュ", thMix], ["オッズだけ（重み1）", [1, 0]], ["オッズだけ（調整した重み）", thMkt]]) {
+  console.log(`\n買い方・勝率は${title}（100円ずつ） | 調整用：頭数・的中・回収率 | 確認用：頭数・的中・回収率`);
+  const a = backtest(dTrain, th), b = backtest(dTest, th);
+  RULES.forEach(([kind, name], j) => console.log([`${kind} ${name}`, f(a[j]), f(b[j])].join(" | ")));
+}
+// 月ごと（オッズだけ・重み1、複勝 期待値1.0以上・下限3倍まで）
+const RULE = RULES.findIndex(([, n]) => n === "期待値1.0以上・下限3倍まで");
+const byMonth = {};
+for (const d of [...dTrain, ...dTest]) (byMonth[d.key.slice(0, 7)] = byMonth[d.key.slice(0, 7)] || []).push(d);
+console.log("\n月 | 複勝 期待値1.0以上・下限3倍まで（オッズだけ）：頭数・的中・回収率");
+for (const [mo, ds] of Object.entries(byMonth).sort()) console.log([mo, f(backtest(ds, [1, 0])[RULE])].join(" | "));
