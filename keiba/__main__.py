@@ -412,6 +412,26 @@ def cmd_tune(args) -> int:
     return 0
 
 
+def cmd_value(args) -> int:
+    """シミュレーションと確定オッズを組み合わせて、期待値で買ったら回収率はどうなるか（keiba/value.js）。数字だけを出す。"""
+    password = page_password()
+    if not password:
+        log.error("パスワードがありません")
+        return 2
+    cache = backtest.load_cache(Path(args.data), password)
+    d = date.fromisoformat
+    parts = [backtest.build_eval_input(cache, d(args.train_start), d(args.train_end)),
+             backtest.build_eval_input(cache, d(args.test_start), d(args.test_end))]
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for i, (day, res) in enumerate(parts):
+            for suffix, obj in (("day", day), ("res", res)):
+                (Path(tmp) / f"{i}_{suffix}.json").write_text(json.dumps(obj, ensure_ascii=False))
+                paths.append(f"{tmp}/{i}_{suffix}.json")
+        print(subprocess.run(["node", str(ROOT / "keiba" / "value.js"), *paths], capture_output=True, text=True, check=True).stdout)
+    return 0
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="keiba")
@@ -445,13 +465,17 @@ def main(argv=None) -> int:
     tu.add_argument("--sims", type=int, default=10000)
     tu.add_argument("--tune-sims", type=int, default=2000)
     tu.add_argument("--data", default=str(ROOT / "data"))
+    va = sub.add_parser("value")
+    for k in ("--train-start", "--train-end", "--test-start", "--test-end"):
+        va.add_argument(k, required=True)
+    va.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "tune": cmd_tune, "sample": cmd_sample,
+    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "tune": cmd_tune, "value": cmd_value, "sample": cmd_sample,
             "build-site": cmd_build_site}[args.cmd](args)
 
 

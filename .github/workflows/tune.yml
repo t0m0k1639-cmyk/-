@@ -20,6 +20,9 @@ on:
       recent_start:
         description: "直近として別に比べる最初の日（空なら比べない）"
         default: "2026-10-24"
+      mode:
+        description: "tune（重みを決める）/ value（オッズと組み合わせた期待値で買う場合）"
+        default: "tune"
 
 permissions:
   contents: read
@@ -49,4 +52,14 @@ jobs:
           C: ${{ inputs.test_start }}
           D: ${{ inputs.test_end }}
           R: ${{ inputs.recent_start }}
+        if: inputs.mode != 'value'
         run: python -m keiba tune --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D" $([ -n "$R" ] && echo --recent-start "$R")
+      - name: オッズと組み合わせた期待値で買う場合
+        if: inputs.mode == 'value'
+        env:
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          A: ${{ inputs.train_start }}
+          B: ${{ inputs.train_end }}
+          C: ${{ inputs.test_start }}
+          D: ${{ inputs.test_end }}
+        run: python -m keiba value --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D"
