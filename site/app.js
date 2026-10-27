@@ -665,7 +665,8 @@
     const anyPlace = day.races.some((r) => (r.horses || []).some((h) => h.place_odds));
     $("buy").hidden = !anyPlace;
     if (!anyPlace) return;
-    $("buy-note").textContent = items.length
+    $("buy-note").textContent = day.odds_final ? "確定オッズで判定（この日はあとから付け足したので、発走前のオッズとは少し違います）"
+      : items.length
       ? `${fmtTime(day.generated_at)}時点のオッズ。締め切り前に「最新にする」で取り直すと入れ替わります。過去1年の検証では的中約7割・回収率100〜114%（新馬戦は除く）`
       : `${fmtTime(day.generated_at)}時点のオッズでは、条件を満たす馬はいません`;
     $("buy-list").replaceChildren(...items.map(({ r, x }) => {

@@ -280,6 +280,24 @@ def cmd_evaluate(args) -> int:
         set_output("updated", "false")
         return 0
     saved = decrypt(json.loads(path.read_text()), password)
+    if args.final_odds and not args.dry_run:
+        # 複勝オッズを持っていなかった日（2026/10/25 以前）に、バックテストの控えの確定オッズを入れて買い候補を出す
+        cache = backtest.load_cache(data_dir, password)
+        n = 0
+        for r in saved["races"]:
+            odds = (cache["races"].get(f"{day.isoformat()}|{r['venue']}-{r['number']}") or {}).get("odds") or {}
+            for h in r["horses"]:
+                o = odds.get(str(h["number"]))
+                if o:
+                    h["odds"], h["place_odds"] = o.get("win") or h.get("odds"), o.get("place")
+                    n += 1
+        saved["odds_final"] = True
+        text = json.dumps(encrypt(saved, password))
+        path.write_text(text)
+        dates = sorted((p.stem for p in (data_dir / "days").glob("*.json")), reverse=True)
+        if dates[0] == day.isoformat():
+            (data_dir / "latest.json").write_text(text)
+        log.info("確定オッズを %d 頭に入れました", n)
     f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], cfg["fetch"]["max_requests"])
     payouts: dict = {}
     results = jra.collect_results(f, day, payouts=payouts)
@@ -447,6 +465,7 @@ def main(argv=None) -> int:
     e.add_argument("--date")
     e.add_argument("--data", default=str(ROOT / "data"))
     e.add_argument("--dry-run", action="store_true", help="集計をログに出すだけで、data/ には書かない")
+    e.add_argument("--final-odds", action="store_true", help="バックテストの控えの確定オッズ（単勝・複勝）を入れてから比べる（過去の日用）")
     bt = sub.add_parser("backtest")
     bt.add_argument("--start", required=True)
     bt.add_argument("--end", required=True)

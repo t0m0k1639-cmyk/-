@@ -16,6 +16,10 @@ on:
         description: "集計をログに出すだけ（ページは変えない）"
         type: boolean
         default: false
+      final_odds:
+        description: "過去の日に、控えの確定オッズを入れて買い候補を出す"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,7 +53,8 @@ jobs:
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
           DRY_RUN: ${{ inputs.dry_run }}
-        run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"} $([ "$DRY_RUN" = "true" ] && echo --dry-run)
+          FINAL_ODDS: ${{ inputs.final_odds }}
+        run: python -m keiba evaluate ${TARGET_DATE:+--date "$TARGET_DATE"} $([ "$DRY_RUN" = "true" ] && echo --dry-run) $([ "$FINAL_ODDS" = "true" ] && echo --final-odds)
       - name: data/ をコミット
         id: commit
         if: steps.run.outputs.updated == 'true'
