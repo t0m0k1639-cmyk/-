@@ -1,0 +1,61 @@
+name: 過去のレースで検証
+
+# JRA公式サイトの過去のレース結果を控えて（続きから）、シミュレーションの予想と比べる。
+# 控えは暗号化して data/backtest/ に置く（ページには載せない）。ログには集計の数字だけを出す
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "検証する最初の日 YYYY-MM-DD"
+        required: true
+      end:
+        description: "検証する最後の日 YYYY-MM-DD"
+        required: true
+      max_requests:
+        description: "この実行で JRA にアクセスする上限（2秒に1回。3000で約100分）"
+        default: "3000"
+      eval_only:
+        description: "取り込まずに、控えにあるレースだけで比べる"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 取り込んで比べる
+        id: run
+        env:
+          KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+          MAX_REQ: ${{ inputs.max_requests }}
+          EVAL_ONLY: ${{ inputs.eval_only }}
+        run: python -m keiba backtest --start "$START" --end "$END" --max-requests "$MAX_REQ" $([ "$EVAL_ONLY" = "true" ] && echo --eval-only)
+      - name: 控えをコミット
+        if: always() && steps.run.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/backtest
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "data: 過去のレース結果の控え（$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')）"
+          git pull --rebase -q
+          git push

@@ -62,7 +62,13 @@
     const sd = Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length) || 1;
     return arr.map((v) => (v === null ? 0 : (v - m) / sd));
   }
-  function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  // 乱数。opts.seed を渡すと毎回同じ結果になる（検証用）
+  let rand = Math.random;
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function gauss() { let u = 0, v = 0; while (!u) u = rand(); while (!v) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 
   // 騎手名が上位騎手の一覧にあれば A（出馬表は「C.ルメール」「ルメール」など表記が揺れるので部分一致）
   function jockeyRank(name) {
@@ -304,7 +310,7 @@
     const eRank = new Array(n); eo.forEach((h, r) => (eRank[h] = r));
     const fs = idx.map((i) => {
       const f = n > 1 ? 1 - eRank[i] / (n - 1) : 1;
-      const jump = Math.random() < 0.12 ? gauss() * m.sigma * 1.6 : 0; // たまに起きる大駆け・大凡走
+      const jump = rand() < 0.12 ? gauss() * m.sigma * 1.6 : 0; // たまに起きる大駆け・大凡走
       return m.base[i] + m.frontK * (2 * f - 1) + gauss() * m.sigma + jump;
     });
     const fo = idx.slice().sort((a, b) => fs[b] - fs[a]);
@@ -314,6 +320,7 @@
 
   // race: ページのレースデータ。manual: {馬番: -2〜+2}（自分の補正）
   function simulate(race, opts = {}) {
+    rand = opts.seed != null ? seeded(opts.seed) : Math.random;
     if (race.surface === "障害") return { error: "障害戦はシミュレーションの対象外です" };
     if (!VENUES[race.venue]) return { error: `${race.venue}のコースデータがありません` };
     const cfg = Object.assign(configFor(race), opts.cfg || {});

@@ -67,7 +67,7 @@ function add(group, name, rho, topWin, topTop3) {
 }
 
 for (const r of day.races) {
-  const key = `${r.venue}-${r.number}`;
+  const key = r.rkey || `${r.venue}-${r.number}`;
   const result = results[key];
   if (!result || !result.length || r.surface === "障害") continue;
   const place = Object.fromEntries(result.map((x) => [x.number, x.place]));
@@ -78,7 +78,7 @@ for (const r of day.races) {
   const hs = running.map((h) => I.features(h, cfg, day.pedigree));
   hs.forEach((h, i) => { h.gate = running.length > 1 ? i / (running.length - 1) : 0; h.manual = 0; });
   const m = I.buildModel(hs, cfg);
-  const sim = simulate(Object.assign({ date: day.date }, r, { horses: running }), { pedigree: day.pedigree, sims: 3000, cfg: { going: cfg.going, cushion: cfg.cushion, moist: "" } });
+  const sim = simulate(Object.assign({ date: day.date }, r, { horses: running }), { pedigree: day.pedigree, sims: 3000, seed: process.env.SEED ? 1 : undefined, cfg: { going: cfg.going, cushion: cfg.cushion, moist: "" } });
   const winP = Object.fromEntries(sim.rows.map((x) => [x.h.num, x.win]));
   const surf = r.surface === "ダート" ? "ダ" : "芝";
   const alts = running.map((h) => alt(h, surf));

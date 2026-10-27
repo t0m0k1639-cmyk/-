@@ -19,7 +19,7 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import bias, jra, pedigree
+from . import backtest, bias, jra, pedigree
 from .crypto import decrypt, encrypt
 from .fetch import FetchError, Fetcher
 from .models import Race
@@ -261,7 +261,7 @@ def cmd_build_site(args) -> int:
     data = Path(args.data)
     if data.exists():
         # 血統の記録（pedigree.json）は集計用でページでは使わないので置かない
-        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep", "pedigree.json", bias.RAW_DIR))
+        shutil.copytree(data, out / "data", ignore=shutil.ignore_patterns(".gitkeep", "pedigree.json", bias.RAW_DIR, "backtest"))
     return 0
 
 
@@ -324,6 +324,47 @@ def cmd_evaluate(args) -> int:
     return 0
 
 
+def cmd_backtest(args) -> int:
+    """過去のレースの結果を控えて（続きから）、シミュレーションの予想と比べる。ログには数字だけを出す。"""
+    cfg = load_config()
+    data_dir = Path(args.data)
+    password = page_password()
+    if not password:
+        log.error("パスワードがありません")
+        return 2
+    start, end = date.fromisoformat(args.start), date.fromisoformat(args.end)
+    cache = backtest.load_cache(data_dir, password)
+    if not args.eval_only:
+        # 検証するレースの各馬の前走〜4走前を作るため、その前の数か月分も取る
+        y, m = start.year, start.month - args.lookback_months
+        while m < 1:
+            y, m = y - 1, m + 12
+        f = Fetcher(contact(cfg), cfg["fetch"]["delay_sec"], args.max_requests)
+        try:
+            added = backtest.crawl(f, cache, date(y, m, 1), end)
+            log.info("結果を %d レース取りました（控えは合計 %d レース、リクエスト %d 件）", added, len(cache["races"]), f.count)
+        except FetchError as e:
+            log.warning("途中で止めました（続きは次の実行で取ります）: %s", e)
+        finally:
+            backtest.save_cache(data_dir, password, cache)
+            set_output("updated", "true")
+    day, results = backtest.build_eval_input(cache, start, end)
+    log.info("検証するレース: %d（%s〜%s）", len(day["races"]), start, end)
+    if not day["races"]:
+        return 0
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "day.json").write_text(json.dumps(day, ensure_ascii=False))
+        (Path(tmp) / "res.json").write_text(json.dumps(results, ensure_ascii=False))
+        env = dict(os.environ, SIMS=str(args.sims), SEED="1")
+        out = "\n".join(
+            subprocess.run(["node", str(ROOT / "keiba" / js), f"{tmp}/day.json", f"{tmp}/res.json"],
+                           capture_output=True, text=True, check=True, env=env).stdout
+            for js in ("eval_sim.js", "diag_sim.js"))
+    # レースごとの行は多すぎるので、集計の表だけを出す
+    print("\n".join(l for l in out.splitlines() if not re.match(r"\d{4}-\d{2}-\d{2}\|", l)))
+    return 0
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="keiba")
@@ -339,13 +380,21 @@ def main(argv=None) -> int:
     e.add_argument("--date")
     e.add_argument("--data", default=str(ROOT / "data"))
     e.add_argument("--dry-run", action="store_true", help="集計をログに出すだけで、data/ には書かない")
+    bt = sub.add_parser("backtest")
+    bt.add_argument("--start", required=True)
+    bt.add_argument("--end", required=True)
+    bt.add_argument("--lookback-months", type=int, default=6)
+    bt.add_argument("--max-requests", type=int, default=4000)
+    bt.add_argument("--sims", type=int, default=20000)
+    bt.add_argument("--eval-only", action="store_true", help="控えにあるレースだけで比べる（JRAにアクセスしない）")
+    bt.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
     b = sub.add_parser("build-site")
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "sample": cmd_sample,
+    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "sample": cmd_sample,
             "build-site": cmd_build_site}[args.cmd](args)
 
 

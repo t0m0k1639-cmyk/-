@@ -10,6 +10,9 @@ require(path.join(__dirname, "..", "site", "sim.js"));
 const { simulate } = window.RaceSim;
 
 const day = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+// 回数と乱数の固定（バックテストは SIMS=20000 SEED=1 で、何度計算しても同じ印にする）
+const SIMS = +(process.env.SIMS || 5000), SEED = !!process.env.SEED;
+const hash = (s) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
 const results = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 
 // シミュレーションの印どおりに100円ずつ買っていたら（払戻金は day.payouts。keiba evaluate が入れる）
@@ -77,12 +80,12 @@ const rate = (s, k) => (s.n ? `${((100 * (s[k] || 0)) / s.n).toFixed(0)}%` : "-"
 
 console.log("レース | 条件 | 頭数 | ◎の着順(人気) | ○ | ▲ | 1番人気の着順 | 3連複(印5頭)");
 for (const r of day.races) {
-  const key = `${r.venue}-${r.number}`;
+  const key = r.rkey || `${r.venue}-${r.number}`;   // バックテストは「日付|競馬場-番号」
   const result = results[key];
   if (!result || !result.length) continue;
   const order = result.map((x) => x.number);
   const res = simulate(Object.assign({ date: day.date }, r), {
-    pedigree: day.pedigree, sims: 5000,
+    pedigree: day.pedigree, sims: SIMS, seed: SEED ? hash(key) : undefined,
     cfg: { going: r.going || "良", cushion: r.cushion != null ? String(r.cushion) : "", moist: "",
       // 発走前までにわかっていた馬場の傾向（keiba evaluate が出す）
       bias: (day.bias_by_race || {})[key] || null },
