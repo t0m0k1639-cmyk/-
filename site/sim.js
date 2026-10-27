@@ -40,14 +40,18 @@
   const GOING_LVL = { "良": 0, "稍重": 0.4, "重": 0.8, "不良": 1 };
   // 要素ごとの重み。cr・ten・ag・fin はレース内で標準化した値に掛ける（cr を 1 とした比）、
   // jk・kin・bw は点数（5点で cr の1標準偏差）に掛ける。noise は揺らぎの大きさ（点数差の何倍か）。
-  // opts.params で上書きできる（keiba/tune.js が過去のレースで重みを決めるときに使う）
+  // 2026/10/27 に keiba tune で決めた値（2025/10〜2026/6 の2471レースで決め、2026/7〜10 の1115レースで確認。
+  // 確認期間で ◎3着内 48%→55%、印の順と着順の順位相関 0.34→0.42）。opts.params で上書きできる
   const PARAMS = {
-    cr: 1, ten: 0.4, ag: 0.1, fin: 0,   // 能力・位置取り・末脚・近走の着順
-    jk: 2.5,                            // 上位騎手
-    kin: -0.9,                          // 斤量 1kg あたり（1600m基準。負なら重いほど不利）
-    bw: 1,                              // 馬体重の増減の減点
-    post: 0,                            // 内枠（コースごとの枠の有利不利に足す）
-    noise: 1.2,
+    cr: 1, ten: 0.38, ag: 0.12,
+    fin: 1.6,                           // 近走の着順（一番効いていた）
+    jk: 5.7,                            // 上位騎手
+    kin: 1.05,                          // 斤量 1kg あたり（1600m基準）。重い馬ほど強い馬なので正になった
+    bw: 0.6,                            // 馬体重の増減の減点
+    post: 0,                            // 内枠（コースごとの枠の有利不利に足す）。ほぼ0だった
+    noise: 1.5,
+    // 自分で入れる補正・調教評価・脚色の効き方。点数差が以前の約2倍に広がったので、効き方が変わらないように2倍にする
+    user: 2,
   };
   // 開催中の馬場の傾向（keiba/bias.py）の効かせ方。front・inner は「ふつうとの差」（0.1 でかなり強い傾向）
   const BIAS_FRONT = 3, BIAS_POST = 2;
@@ -272,7 +276,7 @@
 
   // 1頭ずつの要素（重みを掛ける前）。base = fixed + Σ P[要素] × 要素
   const TERMS = ["cr", "ten", "ag", "fin", "jk", "kin", "bw", "post"];
-  function terms(hs, c) {
+  function terms(hs, c, P = PARAMS) {
     const cr = zscore(hs.map((h) => h.cr)), ten = zscore(hs.map((h) => h.ten)), ag = zscore(hs.map((h) => h.ag));
     const fin = zscore(hs.map((h) => (h.fin == null ? null : h.fin)));
     const ge = goingEffect(c), ce = courseEffect(c);
@@ -286,7 +290,7 @@
     const bias = c.bias || {};
     const biasPost = clamp(BIAS_POST * (bias.inner || 0), -0.3, 0.3);
     const rows = hs.map((h, i) => {
-      let p = 1.5 * (h.manual || 0) + (h.aptAdj || 0) + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0);
+      let p = (h.aptAdj || 0) + (P.user || 1) * (1.5 * (h.manual || 0) + (TRAIN[h.train] || 0) + (KAKU[h.kaku] || 0));
       if (ge.lvl && h.wetDiff != null) {
         // 道悪での成績が良のときより良いか悪いか（走った回数が少ないうちは弱める）
         const wet = ge.lvl * clamp(h.wetDiff, -6, 6) * 1.2 * (h.wetN / (h.wetN + 1.5));
@@ -307,7 +311,7 @@
 
   function buildModel(hs, c, P = PARAMS) {
     const n = hs.length;
-    const { rows, ge, ce, pace, bias } = terms(hs, c);
+    const { rows, ge, ce, pace, bias } = terms(hs, c, P);
     const ten = zscore(hs.map((h) => h.ten));
     const paceFront = { S: 0.3, M: 0, H: -0.3 }[pace];
     const k = [0, 0.2, 0.4, 0.65][+c.strength];
