@@ -38,6 +38,9 @@ def main() -> None:
             continue
         acts = [x for x in parse.extract_actions(page) if x.cname.startswith("pw01srl")]
         print(cname, "開催日のリンク:", len(acts), [(x.cname, masked(x.text, 30)) for x in acts[:4]])
+        allacts = parse.extract_actions(page)
+        print("  ほかのリンク:", len(allacts), sorted({x.cname[:9] for x in allacts}))
+        print("  本文:", masked(parse.main_part(page), 1500))
         if acts:
             break
 
