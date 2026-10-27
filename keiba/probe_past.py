@@ -26,9 +26,14 @@ def main() -> None:
     acts = parse.extract_actions(page)
     print("リンク数:", len(acts), "例:", [(a.cname, masked(a.text, 40)) for a in acts[:8]])
     print("本文:", masked(parse.main_part(page), 2500))
-    sel = soup.find("select")
-    if sel:
-        print("select:", masked(str(sel)[:1500], 1500))
+    for sel in soup.find_all("select"):
+        print("select:", sel.get("id"), masked(str(sel)[:300], 300))
+    for sc in soup.find_all("script"):
+        t = sc.get_text()
+        if re.search(r"kaisai|doAction|cname|CNAME|objParam", t):
+            print("\n--- script ---\n", masked(t, 4000))
+    for b in soup.find_all(["button", "input", "a"], onclick=True)[:20]:
+        print("onclick:", masked(str(b), 300))
 
 
 if __name__ == "__main__":
