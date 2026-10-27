@@ -507,6 +507,32 @@ def parse_win_odds(html: str) -> list[float]:
     return [odds[k] for k in sorted(odds)]
 
 
+PLACE_RANGE_RE = re.compile(r"(\d+(?:,\d{3})*\.\d)\s*[-－ー～~]\s*(\d+(?:,\d{3})*\.\d)")
+
+
+def parse_odds_table(html: str) -> dict[int, dict]:
+    """単勝・複勝オッズのページから {馬番: {"win": 単勝, "place": [複勝の下限, 上限]}}（取消は除く）。"""
+    out: dict[int, dict] = {}
+    soup = BeautifulSoup(html, "html.parser")
+    for tr in soup.find_all("tr"):
+        tds = tr.find_all("td")
+        if not tds:
+            continue
+        cells = [norm(td.get_text(" ")) for td in tds]
+        if SCRATCH_RE.search(" ".join(cells)):
+            continue
+        num = next((int(c) for c in cells[:3] if re.fullmatch(r"\d{1,2}", c)), None)
+        if num is None or not 1 <= num <= 18 or num in out:
+            continue
+        win = next((c for td, c in zip(tds, cells) if "tan" in " ".join(td.get("class", [])) and re.fullmatch(r"\d+(?:,\d{3})*\.\d", c)), None)
+        win = win or next((c for c in cells if re.fullmatch(r"\d+(?:,\d{3})*\.\d", c)), None)
+        rng = next((m for m in map(PLACE_RANGE_RE.search, cells) if m), None)
+        if win or rng:
+            out[num] = {"win": float(win.replace(",", "")) if win else None,
+                        "place": [float(rng.group(1).replace(",", "")), float(rng.group(2).replace(",", ""))] if rng else None}
+    return out
+
+
 GOINGS = ["不良", "稍重", "重", "良"]   # 「稍重」を「重」より先に
 
 

@@ -74,11 +74,14 @@ def parse_result_day_rows(html: str) -> list[dict]:
         cell = lambda c: parse.norm(tr.find("td", class_=c).get_text(" ")) if tr.find("td", class_=c) else ""
         name, course = cell("race_name"), cell("course")
         dist = tr.find("td", class_="dist")
+        odds_td = tr.find("td", class_="odds")
+        odds_a = odds_td.find("a") if odds_td else None
         distance = parse._digits(dist.find(string=True, recursive=False) or dist.get_text(" ")) if dist else None
         surface = "障害" if ("障害" in name or "障害" in course) else ("ダート" if course.startswith("ダ") else "芝")
         rows.append({
             "number": number, "name": name, "race_class": parse.parse_conditions(name).get("race_class") or "",
             "surface": surface, "distance": distance, "link": a["href"],
+            "odds_link": parse.link_from_tag(odds_a) if odds_a else None,
         })
     return rows
 
@@ -128,40 +131,87 @@ def race_going(html: str, surface: str) -> str | None:
     return g.get("ダート" if surface == "ダート" else "芝") or next(iter(g.values()), None)
 
 
+def _get_odds(f: Fetcher, race: dict, link) -> None:
+    """確定オッズ（単勝・複勝）を race["odds"] に入れる。取れなければ空にして、次からは取りに行かない。"""
+    if link is None:
+        race["odds"] = {}
+        return
+    try:
+        race["odds"] = {str(k): v for k, v in jra.odds_table(f, link).items()}
+    except FetchError as e:
+        if "上限" in str(e):
+            raise
+        log.warning("%s %s%dR のオッズを取れませんでした: %s", race["date"], race["venue"], race["number"], e)
+
+
+def _month_days(f: Fetcher, codes: dict, y: int, m: int):
+    code = codes.get(f"{y % 100:02d}{m:02d}")
+    if not code:
+        log.warning("%d年%d月のコードがありません", y, m)
+        return []
+    # 過去の月は pw01skl10、今月は pw01skl00 のページに開催日の一覧がある
+    days = day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl10{y}{m:02d}/{code}"))
+    return days or day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl00{y}{m:02d}/{code}"))
+
+
+def crawl_odds(f: Fetcher, cache: dict, start: date, end: date) -> int:
+    """控えにある start〜end のレースのうち、オッズがまだないものだけ確定オッズを取る。取ったレース数を返す。"""
+    todo = {k for k, r in cache["races"].items() if "odds" not in r and start.isoformat() <= r["date"] <= end.isoformat()}
+    if not todo:
+        return 0
+    codes = month_codes(f.post_cname(*SEARCH))
+    done = 0
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        for d, venue, act in _month_days(f, codes, y, m):
+            if not (start <= d <= end) or not any(k.startswith(f"{d}|{venue}-") for k in todo):
+                continue
+            try:
+                rows = parse_result_day_rows(f.post_cname(act.path, act.cname))
+            except FetchError as e:
+                if "上限" in str(e):
+                    raise
+                log.warning("%s %s を取れませんでした: %s", d, venue, e)
+                continue
+            for row in rows:
+                key = f"{d}|{venue}-{row['number']}"
+                if key in todo:
+                    _get_odds(f, cache["races"][key], row["odds_link"])
+                    done += 1
+        m += 1
+        if m > 12:
+            y, m = y + 1, 1
+    return done
+
+
 def crawl(f: Fetcher, cache: dict, start: date, end: date) -> int:
     """start〜end の全レースの結果を控えに足す（控えにあるレースは飛ばす）。足したレース数を返す。"""
     codes = month_codes(f.post_cname(*SEARCH))
     added = 0
     y, m = start.year, start.month
     while (y, m) <= (end.year, end.month):
-        code = codes.get(f"{y % 100:02d}{m:02d}")
-        if not code:
-            log.warning("%d年%d月のコードがありません", y, m)
-        else:
-            # 過去の月は pw01skl10、今月は pw01skl00 のページに開催日の一覧がある
-            days = day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl10{y}{m:02d}/{code}"))
-            if not days:
-                days = day_actions(f.post_cname("/JRADB/accessS.html", f"pw01skl00{y}{m:02d}/{code}"))
-            for d, venue, act in days:
-                if not (start <= d <= end) or f"{d}|{venue}" in cache["days"]:
-                    continue
-                try:
-                    rows = parse_result_day_rows(f.post_cname(act.path, act.cname))
-                    for row in rows:
-                        key = f"{d}|{venue}-{row['number']}"
-                        if key in cache["races"]:
-                            continue
-                        html = jra._open(f, parse.Link(row.pop("link"), None, ""))
-                        cache["races"][key] = dict(row, date=d.isoformat(), venue=venue,
-                                                   going=race_going(html, row["surface"]),
-                                                   runners=parse_result_runners(html),
-                                                   payouts=parse.parse_payouts(html))
-                        added += 1
-                    cache["days"].append(f"{d}|{venue}")
-                except FetchError as e:
-                    if "上限" in str(e):
-                        raise
-                    log.warning("%s %s を取れませんでした: %s", d, venue, e)
+        for d, venue, act in _month_days(f, codes, y, m):
+            if not (start <= d <= end) or f"{d}|{venue}" in cache["days"]:
+                continue
+            try:
+                rows = parse_result_day_rows(f.post_cname(act.path, act.cname))
+                for row in rows:
+                    key = f"{d}|{venue}-{row['number']}"
+                    if key in cache["races"]:
+                        continue
+                    odds_link = row.pop("odds_link")
+                    html = jra._open(f, parse.Link(row.pop("link"), None, ""))
+                    race = cache["races"][key] = dict(row, date=d.isoformat(), venue=venue,
+                                                      going=race_going(html, row["surface"]),
+                                                      runners=parse_result_runners(html),
+                                                      payouts=parse.parse_payouts(html))
+                    _get_odds(f, race, odds_link)
+                    added += 1
+                cache["days"].append(f"{d}|{venue}")
+            except FetchError as e:
+                if "上限" in str(e):
+                    raise
+                log.warning("%s %s を取れませんでした: %s", d, venue, e)
         m += 1
         if m > 12:
             y, m = y + 1, 1
@@ -211,7 +261,9 @@ def build_eval_input(cache: dict, start: date, end: date) -> tuple[dict, dict]:
         if not (start <= d <= end):
             continue
         horses = []
+        odds = race.get("odds") or {}
         for r in race["runners"]:
+            o = odds.get(str(r["number"])) or {}
             past = [p for dd, p in hist.get(r["horse_id"], []) if dd < race["date"]][:4]
             prev_bw = next((p["body_weight"] for p in past if p["body_weight"]), None)
             horses.append({
@@ -219,6 +271,7 @@ def build_eval_input(cache: dict, start: date, end: date) -> tuple[dict, dict]:
                 "weight": r["kin"], "jockey": r["jockey"], "popularity": r["popularity"], "past": past,
                 "scratched": r["status"] in ("取消", "除外", "競走除外"),
                 "body_weight": r["body_weight"], "body_weight_diff": r["body_weight_diff"],
+                "odds": o.get("win"), "place_odds": o.get("place"),
             })
         races.append({
             "rkey": key, "date": race["date"], "venue": race["venue"], "number": race["number"],

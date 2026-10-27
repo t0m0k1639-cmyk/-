@@ -122,6 +122,17 @@ def _odds(f: Fetcher, link: parse.Link) -> list[float]:
     return odds
 
 
+def odds_table(f: Fetcher, link: parse.Link) -> dict[int, dict]:
+    """オッズのページから単勝・複勝（終わったレースは確定オッズ）。"""
+    html = _open(f, link)
+    odds = parse.parse_odds_table(html)
+    if not odds:
+        tan = next((l for l in parse.extract_links(html) if "単勝" in l.text), None)
+        if tan:
+            odds = parse.parse_odds_table(_open(f, tan))
+    return odds
+
+
 def collect_going(f: Fetcher) -> dict[str, dict[str, str]]:
     """馬場情報。index.html が1場目、index2.html・index3.html が2場目以降。"""
     first = f.get("/keiba/baba/")

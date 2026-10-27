@@ -37,6 +37,16 @@ def main() -> None:
     print("開催ページの行数:", len(tr))
     for t in tr[:3]:
         print("行:", masked(str(t), 1200))
+    # 終わったレースのオッズ（単勝・複勝）
+    from .backtest import parse_result_day_rows
+    row = parse_result_day_rows(page)[0]
+    if row["odds_link"]:
+        oh = jra._open(f, row["odds_link"])
+        os_ = parse.BeautifulSoup(oh, "html.parser")
+        rows = [t for t in os_.select("table tr") if t.find("td")][:2]
+        for t in rows:
+            print("\nオッズの行:", masked(str(t), 2500))
+        print("\n読み取り:", jra.odds_table(f, row["odds_link"]))
     a = soup.select_one("th.race_num a[href]")
     res = jra._open(f, parse.Link(a["href"], None, ""))
     rs = parse.BeautifulSoup(res, "html.parser")
