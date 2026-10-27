@@ -77,6 +77,27 @@ const VALUE = [
   ["（参考）シミュ1位 × 1〜3番人気", (rk, pop) => rk === 1 && pop <= 3],
 ];
 const value = VALUE.map(([name]) => ({ name, n: 0, win: 0, plc: 0, wins: 0, plcs: 0 }));
+// 期待値（シミュレーションの確率 × 確定オッズ）で買っていたら。x = {p1 勝率, p3 複勝率, pm 人気から見た勝率, o 単勝, lo 複勝の下限, mark 印の順}
+const blend = (x) => Math.sqrt(x.p1 * x.pm);   // シミュレーションと人気を半分ずつ（あとでレース内で合計1にそろえる）
+const EV = [
+  ["単勝", "単勝 期待値1.0以上", (x) => x.p1 * x.o >= 1.0],
+  ["単勝", "単勝 期待値1.2以上", (x) => x.p1 * x.o >= 1.2],
+  ["単勝", "単勝 期待値1.5以上", (x) => x.p1 * x.o >= 1.5],
+  ["単勝", "単勝 期待値2.0以上", (x) => x.p1 * x.o >= 2.0],
+  ["単勝", "単勝 期待値1.2以上・オッズ20倍まで", (x) => x.p1 * x.o >= 1.2 && x.o <= 20],
+  ["単勝", "単勝 人気と混ぜた期待値1.1以上", (x) => x.pb * x.o >= 1.1],
+  ["単勝", "単勝 人気と混ぜた期待値1.2以上", (x) => x.pb * x.o >= 1.2],
+  ["複勝", "複勝 期待値1.0以上（下限で計算）", (x) => x.lo && x.p3 * x.lo >= 1.0],
+  ["複勝", "複勝 期待値1.2以上（下限で計算）", (x) => x.lo && x.p3 * x.lo >= 1.2],
+  ["複勝", "複勝 期待値1.5以上（下限で計算）", (x) => x.lo && x.p3 * x.lo >= 1.5],
+  ["複勝", "複勝 期待値1.2以上・複勝率30%以上", (x) => x.lo && x.p3 >= 0.3 && x.p3 * x.lo >= 1.2],
+  ["複勝", "複勝◎ 下限1.5倍以上のときだけ", (x) => x.mark === 0 && x.lo >= 1.5],
+  ["複勝", "複勝◎ 下限2.0倍以上のときだけ", (x) => x.mark === 0 && x.lo >= 2.0],
+  ["複勝", "複勝◎○ 下限2.0倍以上のときだけ", (x) => x.mark <= 1 && x.lo >= 2.0],
+  ["単勝", "単勝◎ 5倍以上のときだけ", (x) => x.mark === 0 && x.o >= 5],
+];
+const ev = EV.map(([kind, name]) => ({ kind, name, n: 0, hit: 0, ret: 0, races: new Set() }));
+const days = new Set();
 const yenOf = (list, num) => (list || []).filter((p) => p.nums.length === 1 && p.nums[0] === num).reduce((a, p) => a + p.yen, 0);
 function spearman(x, y) {
   const rk = (a) => { const idx = a.map((_, i) => i).sort((p, q) => a[p] - a[q]), r = new Array(a.length);
@@ -150,6 +171,24 @@ for (const r of day.races) {
     add(g, "pay", 1);
     add(g, "honWinYen", yenOf(pay.win, marks[0]));
     add(g, "honPlcYen", yenOf(pay.place, marks[0]));
+    const oddsOf = (num) => (r.horses || []).find((h) => h.number === num) || {};
+    const inv = res.rows.reduce((a, x) => a + (oddsOf(x.h.num).odds ? 1 / oddsOf(x.h.num).odds : 0), 0);
+    if (inv) {
+      days.add(r.date || day.date);
+      const xs = res.rows.map((x, i) => {
+        const h = oddsOf(x.h.num);
+        return h.odds ? { num: x.h.num, p1: x.win, p3: x.top3, pm: 1 / h.odds / inv, o: h.odds, lo: (h.place_odds || [])[0], mark: i } : null;
+      }).filter(Boolean);
+      const bs = xs.reduce((a, x) => a + blend(x), 0);
+      xs.forEach((x) => (x.pb = blend(x) / bs));
+      for (const x of xs) {
+        EV.forEach(([kind, , ok], j) => {
+          if (!ok(x)) return;
+          const e = ev[j], y = yenOf(kind === "単勝" ? pay.win : pay.place, x.num);
+          e.n++; e.ret += y; if (y) e.hit++; e.races.add(key);
+        });
+      }
+    }
     res.rows.forEach((x, i) => {
       const pp = pop(x.h.num);
       if (!pp) return;
@@ -201,6 +240,14 @@ if (value.some((v) => v.n)) {
     if (!v.n) continue;
     console.log([v.name, v.n, `${Math.round((100 * v.wins) / v.n)}%`, `${Math.round(v.win / v.n)}%`,
       `${Math.round((100 * v.plcs) / v.n)}%`, `${Math.round(v.plc / v.n)}%`].join(" | "));
+  }
+}
+
+if (ev.some((e) => e.n)) {
+  console.log(`\n期待値で買う（確定オッズ・100円ずつ・${days.size}日） | 買った頭数 | 1日あたり | 的中率 | 回収率`);
+  for (const e of ev) {
+    if (!e.n) continue;
+    console.log([e.name, e.n, (e.n / days.size).toFixed(1), `${Math.round((100 * e.hit) / e.n)}%`, `${Math.round(e.ret / e.n)}%`].join(" | "));
   }
 }
 

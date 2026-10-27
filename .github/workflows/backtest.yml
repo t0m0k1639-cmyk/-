@@ -14,6 +14,10 @@ on:
       max_requests:
         description: "この実行で JRA にアクセスする上限（2秒に1回。3000で約100分）"
         default: "3000"
+      odds:
+        description: "検証期間のレースの確定オッズ（単勝・複勝）も取る（1レース1回アクセスが増える）"
+        type: boolean
+        default: false
       eval_only:
         description: "取り込まずに、控えにあるレースだけで比べる"
         type: boolean
@@ -48,7 +52,8 @@ jobs:
           END: ${{ inputs.end }}
           MAX_REQ: ${{ inputs.max_requests }}
           EVAL_ONLY: ${{ inputs.eval_only }}
-        run: python -m keiba backtest --start "$START" --end "$END" --max-requests "$MAX_REQ" $([ "$EVAL_ONLY" = "true" ] && echo --eval-only)
+          ODDS: ${{ inputs.odds }}
+        run: python -m keiba backtest --start "$START" --end "$END" --max-requests "$MAX_REQ" $([ "$EVAL_ONLY" = "true" ] && echo --eval-only) $([ "$ODDS" = "true" ] && echo --odds)
       - name: 控えをコミット
         if: always() && steps.run.outputs.updated == 'true'
         run: |

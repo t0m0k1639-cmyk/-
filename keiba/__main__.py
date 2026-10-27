@@ -343,6 +343,9 @@ def cmd_backtest(args) -> int:
         try:
             added = backtest.crawl(f, cache, date(y, m, 1), end)
             log.info("結果を %d レース取りました（控えは合計 %d レース、リクエスト %d 件）", added, len(cache["races"]), f.count)
+            if args.odds:
+                got = backtest.crawl_odds(f, cache, start, end)
+                log.info("確定オッズを %d レース取りました（リクエスト %d 件）", got, f.count)
         except FetchError as e:
             log.warning("途中で止めました（続きは次の実行で取ります）: %s", e)
         finally:
@@ -352,7 +355,8 @@ def cmd_backtest(args) -> int:
     log.info("控えの月ごとのレース数: %s", dict(sorted(Counter(k[:7] for k in cache["races"]).items())))
     log.info("検証期間の日ごとのレース数: %s", dict(sorted(Counter(k[:10] for k in cache["races"] if args.start <= k[:10] <= args.end).items())))
     day, results = backtest.build_eval_input(cache, start, end)
-    log.info("検証するレース: %d（%s〜%s）", len(day["races"]), start, end)
+    log.info("検証するレース: %d（%s〜%s）、うちオッズあり %d", len(day["races"]), start, end,
+             sum(1 for r in day["races"] if any(h.get("odds") for h in r["horses"])))
     if not day["races"]:
         return 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -430,6 +434,7 @@ def main(argv=None) -> int:
     bt.add_argument("--max-requests", type=int, default=4000)
     bt.add_argument("--sims", type=int, default=20000)
     bt.add_argument("--eval-only", action="store_true", help="控えにあるレースだけで比べる（JRAにアクセスしない）")
+    bt.add_argument("--odds", action="store_true", help="検証期間のレースの確定オッズ（単勝・複勝）も取る")
     bt.add_argument("--data", default=str(ROOT / "data"))
     tu = sub.add_parser("tune")
     tu.add_argument("--train-start", required=True)
