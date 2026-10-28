@@ -21,7 +21,7 @@ on:
         description: "直近として別に比べる最初の日（空なら比べない）"
         default: "2026-10-24"
       mode:
-        description: "tune（重みを決める）/ value（オッズと組み合わせた期待値で買う場合）"
+        description: "tune（重みを決める）/ value（オッズと組み合わせた期待値で買う場合）/ trio（3連複・3連単の買い方）"
         default: "tune"
 
 permissions:
@@ -55,11 +55,12 @@ jobs:
         if: inputs.mode != 'value'
         run: python -m keiba tune --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D" $([ -n "$R" ] && echo --recent-start "$R")
       - name: オッズと組み合わせた期待値で買う場合
-        if: inputs.mode == 'value'
+        if: inputs.mode == 'value' || inputs.mode == 'trio'
         env:
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           A: ${{ inputs.train_start }}
           B: ${{ inputs.train_end }}
           C: ${{ inputs.test_start }}
           D: ${{ inputs.test_end }}
-        run: python -m keiba value --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D"
+          SCRIPT: ${{ inputs.mode }}.js
+        run: python -m keiba value --script "$SCRIPT" --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D"

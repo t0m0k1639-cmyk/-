@@ -446,7 +446,7 @@ def cmd_value(args) -> int:
             for suffix, obj in (("day", day), ("res", res)):
                 (Path(tmp) / f"{i}_{suffix}.json").write_text(json.dumps(obj, ensure_ascii=False))
                 paths.append(f"{tmp}/{i}_{suffix}.json")
-        print(subprocess.run(["node", str(ROOT / "keiba" / "value.js"), *paths], capture_output=True, text=True, check=True).stdout)
+        print(subprocess.run(["node", str(ROOT / "keiba" / args.script), *paths], capture_output=True, text=True, check=True).stdout)
     return 0
 
 
@@ -487,6 +487,8 @@ def main(argv=None) -> int:
     va = sub.add_parser("value")
     for k in ("--train-start", "--train-end", "--test-start", "--test-end"):
         va.add_argument(k, required=True)
+    va.add_argument("--script", default="value.js", choices=["value.js", "trio.js"],
+                    help="value.js：期待値で単勝・複勝を買う / trio.js：3連複・3連単の買い方を比べる")
     va.add_argument("--data", default=str(ROOT / "data"))
     s = sub.add_parser("sample")
     s.add_argument("--data", default=str(ROOT / ".preview" / "data"))
