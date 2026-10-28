@@ -8,7 +8,22 @@ const fs = require("fs");
 const path = require("path");
 global.window = {};
 require(path.join(__dirname, "..", "site", "sim.js"));
-const { placeValue, _internal: I } = window.RaceSim;
+const { simulate, placeValue, _internal: I } = window.RaceSim;
+const SIMS = +(process.env.TRIO_SIMS || 2000);
+const hash = (s) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
+// 勝率から3着内率（ハーヴィル式）
+function harville3(p) {
+  const n = p.length, out = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    out[i] += p[i];
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      out[i] += p[j] * p[i] / (1 - p[j]);
+      for (let k = 0; k < n; k++) if (k !== i && k !== j) out[i] += p[k] * p[j] / (1 - p[k]) * p[i] / (1 - p[k] - p[j]);
+    }
+  }
+  return out;
+}
 const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 
 function dataset(day, results) {
@@ -36,7 +51,16 @@ function dataset(day, results) {
     const ps = running.map((h) => 1 / h.odds / inv);
     const ent = -ps.reduce((a, p) => a + p * Math.log(p), 0) / Math.log(running.length);
     const pv = placeValue(Object.assign({}, r, { horses: running })).filter((x) => x.buy).sort((a, b) => b.ev - a.ev).map((x) => x.num);
-    out.push({ key, n: running.length, byPop, bySim, byMix, ent, pv, trio: pay.trio, tierce: pay.tierce || [] });
+    // 3着内率：シミュレーション（実際に回す）・オッズ（ハーヴィル式）・その平均
+    const sim = simulate(Object.assign({ date: day.date }, r, { horses: running }), { sims: SIMS, seed: hash(key), cfg: { going: r.going || "良", cushion: "", moist: "" } });
+    const p3s = Object.fromEntries((sim.rows || []).map((x) => [x.h.num, x.top3]));
+    const pm = harville3(ps);
+    const p3 = {
+      sim: Object.fromEntries(nums.map((n) => [n, p3s[n] || 0])),
+      mkt: Object.fromEntries(nums.map((n, i) => [n, pm[i]])),
+    };
+    p3.avg = Object.fromEntries(nums.map((n) => [n, (p3.sim[n] + p3.mkt[n]) / 2]));
+    out.push({ key, n: running.length, byPop, bySim, byMix, ent, pv, p3, trio: pay.trio, tierce: pay.tierce || [] });
   }
   return out;
 }
@@ -48,6 +72,21 @@ const uniqSets = (ts) => [...new Map(ts.filter((t) => new Set(t).size === 3).map
 // 1列目 a・2列目 b・3列目 c のフォーメーション
 const formTrio = (a, b, c) => uniqSets(a.flatMap((x) => b.flatMap((y) => c.map((z) => [x, y, z]))));
 const formTierce = (a, b, c) => a.flatMap((x) => b.filter((y) => y !== x).flatMap((y) => c.filter((z) => z !== x && z !== y).map((z) => [x, y, z])));
+
+// 3着内率が t 以上の馬（3頭に満たなければ上から3頭）。src は sim / mkt / avg
+const above = (d, src, t) => {
+  const order = Object.keys(d.p3[src]).map(Number).sort((a, b) => d.p3[src][b] - d.p3[src][a]);
+  const xs = order.filter((n) => d.p3[src][n] >= t);
+  return xs.length >= 3 ? xs : order.slice(0, 3);
+};
+const SRC = { sim: "シミュの複勝率", mkt: "オッズから見た複勝率", avg: "シミュとオッズの平均の複勝率" };
+const THRESH = [];
+for (const src of ["sim", "mkt", "avg"]) {
+  for (const t of [0.2, 0.25, 0.3, 0.35]) {
+    THRESH.push([`3連複 ${SRC[src]}${t * 100}%以上をBOX`, "trio", (d) => triples(above(d, src, t))]);
+    THRESH.push([`3連複 ${SRC[src]}1位軸→${t * 100}%以上へ流し`, "trio", (d) => { const xs = above(d, src, t); return pairs(xs.slice(1)).map((p) => [xs[0], ...p]); }]);
+  }
+}
 
 const STRATS = [
   // [名前, 券種, (d) => 買い目]
@@ -66,6 +105,7 @@ const STRATS = [
   ["3連単 1番人気1着→人気2〜5番→人気2〜5番", "tierce", (d) => formTierce([d.byPop[0]], d.byPop.slice(1, 5), d.byPop.slice(1, 5))],
   ["3連単 人気＋シミュ1位1着→2〜5位→2〜5位", "tierce", (d) => formTierce([d.byMix[0]], d.byMix.slice(1, 5), d.byMix.slice(1, 5))],
   ["3連単 人気＋シミュ1〜2位→1〜4位→1〜6位", "tierce", (d) => formTierce(d.byMix.slice(0, 2), d.byMix.slice(0, 4), d.byMix.slice(0, 6))],
+  ...THRESH,
 ];
 
 function run(data) {
@@ -88,7 +128,7 @@ function run(data) {
   }
   return st;
 }
-const fmt = (s) => s.races ? `${Math.round(s.cost / s.races / 100)}点・的中${Math.round((100 * s.hit) / s.races)}%・回収${Math.round((100 * s.ret) / s.cost)}%` : "-";
+const fmt = (s) => s.races ? `平均${(s.cost / s.races / 100).toFixed(1)}点・的中${Math.round((100 * s.hit) / s.races)}%・回収${Math.round((100 * s.ret) / s.cost)}%` : "-";
 
 const dTrain = dataset(read(process.argv[2]), read(process.argv[3]));
 const dTest = dataset(read(process.argv[4]), read(process.argv[5]));
