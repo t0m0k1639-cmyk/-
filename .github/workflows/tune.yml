@@ -52,7 +52,7 @@ jobs:
           C: ${{ inputs.test_start }}
           D: ${{ inputs.test_end }}
           R: ${{ inputs.recent_start }}
-        if: inputs.mode != 'value'
+        if: inputs.mode == 'tune'
         run: python -m keiba tune --train-start "$A" --train-end "$B" --test-start "$C" --test-end "$D" $([ -n "$R" ] && echo --recent-start "$R")
       - name: オッズと組み合わせた期待値で買う場合
         if: inputs.mode == 'value' || inputs.mode == 'trio'
