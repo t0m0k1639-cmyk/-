@@ -82,7 +82,7 @@ const above = (d, src, t) => {
 const SRC = { sim: "シミュの複勝率", mkt: "オッズから見た複勝率", avg: "シミュとオッズの平均の複勝率" };
 const THRESH = [];
 for (const src of ["sim", "mkt", "avg"]) {
-  for (const t of [0.2, 0.25, 0.3, 0.35]) {
+  for (const t of [0.15, 0.2, 0.25, 0.3, 0.35]) {
     THRESH.push([`3連複 ${SRC[src]}${t * 100}%以上をBOX`, "trio", (d) => triples(above(d, src, t))]);
     THRESH.push([`3連複 ${SRC[src]}1位軸→${t * 100}%以上へ流し`, "trio", (d) => { const xs = above(d, src, t); return pairs(xs.slice(1)).map((p) => [xs[0], ...p]); }]);
   }
