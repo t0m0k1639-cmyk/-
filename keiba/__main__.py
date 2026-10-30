@@ -150,6 +150,9 @@ def cmd_run(args) -> int:
             log.warning("含水率・クッション値の取得に失敗: %s", e)
             baba = {}
         jra.merge_going(races, going, baba)
+        for r in races:
+            for h in r.horses:
+                h.odds_morning, h.place_odds_morning = h.odds, h.place_odds
         warnings = validate(races)
     except (FetchError, ParseError) as e:
         log.error("%s", e)
@@ -213,6 +216,13 @@ def cmd_refresh(args) -> int:
         write_status(data_dir, day, "error", f"{label} の更新に失敗: {e}")
         return 2
     by_key = {(r.venue, r.number): r for r in news}
+    for r in races:   # 朝の時点のオッズは取り直しても残す
+        new = by_key.get((r.venue, r.number))
+        if new:
+            before = {h.number: h for h in r.horses}
+            for h in new.horses:
+                if h.number in before:
+                    h.odds_morning, h.place_odds_morning = before[h.number].odds_morning, before[h.number].place_odds_morning
     races = [by_key.get((r.venue, r.number), r) for r in races]
     for new in news:   # 同じ競馬場の馬場は他のレースにも反映する
         for r in races:
@@ -451,24 +461,65 @@ def cmd_value(args) -> int:
 
 
 def cmd_audit(args) -> int:
-    """シミュレーションの精査（keiba/audit.js）。最初の期間で混ぜ方を決め、ほかの期間で確かめる。数字だけを出す。"""
+    """シミュレーションの精査（keiba/audit.js）か複勝の買い候補の検証（keiba/place.js）。最初の期間で決め、ほかの期間で確かめる。数字だけを出す。"""
     password = page_password()
     if not password:
         log.error("パスワードがありません")
         return 2
     cache = backtest.load_cache(Path(args.data), password)
-    labels, paths = [], []
-    with tempfile.TemporaryDirectory() as tmp:
-        for i, spec in enumerate(args.period):
+    if args.morning:
+        # 同じレースで、朝の取り込みのオッズと確定オッズのどちらを使うかだけを変えて比べる
+        sets, labels = morning_inputs(Path(args.data), password, cache)
+    else:
+        sets, labels = [], []
+        for spec in args.period or []:
             label, start, end = spec.split(":")
-            day, res = backtest.build_eval_input(cache, date.fromisoformat(start), date.fromisoformat(end))
+            sets.append(backtest.build_eval_input(cache, date.fromisoformat(start), date.fromisoformat(end)))
+            labels.append(f"{label}（{start}〜{end}）")
+    paths = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, (day, res) in enumerate(sets):
             for suffix, obj in (("day", day), ("res", res)):
                 (Path(tmp) / f"{i}_{suffix}.json").write_text(json.dumps(obj, ensure_ascii=False))
                 paths.append(f"{tmp}/{i}_{suffix}.json")
-            labels.append(f"{label}（{start}〜{end}）")
-        print(subprocess.run(["node", str(ROOT / "keiba" / "audit.js"), *paths], capture_output=True, text=True, check=True,
+        print(subprocess.run(["node", str(ROOT / "keiba" / args.script), *paths], capture_output=True, text=True, check=True,
                              env=dict(os.environ, LABELS=",".join(labels), SIMS=str(args.sims))).stdout)
     return 0
+
+
+def morning_inputs(data_dir: Path, password: str, cache: dict) -> tuple[list, list]:
+    """朝の取り込みのオッズが残っている日（data/days）と、控えの確定オッズ・着順・払戻金を合わせる。
+
+    同じレースで、オッズだけを「朝の時点」と「確定」に入れ替えた2組の (日のデータ, 着順) を返す。
+    """
+    out = {"morning": ({"date": "", "races": [], "pedigree": {}, "payouts": {}}, {}),
+           "final": ({"date": "", "races": [], "pedigree": {}, "payouts": {}}, {})}
+    for path in sorted((data_dir / "days").glob("*.json")):
+        saved = decrypt(json.loads(path.read_text()), password)
+        if saved.get("sample"):
+            continue
+        for r in saved["races"]:
+            key = f"{saved['date']}|{r['venue']}-{r['number']}"
+            c = cache["races"].get(key)
+            if not c or not c.get("odds") or not any(h.get("odds_morning") for h in r["horses"]):
+                continue
+            results = sorted(({"place": x["place"], "number": x["number"], "popularity": x["popularity"],
+                               "corners": x["corners"]} for x in c["runners"] if x["place"]), key=lambda x: x["place"])
+            for which in ("morning", "final"):
+                horses = []
+                for h in r["horses"]:
+                    h = dict(h)
+                    if which == "morning":
+                        h["odds"], h["place_odds"] = h.get("odds_morning"), h.get("place_odds_morning")
+                    else:
+                        o = c["odds"].get(str(h["number"])) or {}
+                        h["odds"], h["place_odds"] = o.get("win"), o.get("place")
+                    horses.append(h)
+                day, res = out[which]
+                day["races"].append(dict(r, rkey=key, date=saved["date"], horses=horses))
+                day["payouts"][key] = c["payouts"]
+                res[key] = results
+    return [out["morning"], out["final"]], ["朝の取り込みのオッズ", "確定オッズ"]
 
 
 def main(argv=None) -> int:
@@ -506,8 +557,11 @@ def main(argv=None) -> int:
     tu.add_argument("--tune-sims", type=int, default=2000)
     tu.add_argument("--data", default=str(ROOT / "data"))
     au = sub.add_parser("audit")
-    au.add_argument("--period", action="append", required=True, help="名前:最初の日:最後の日（最初の期間で混ぜ方を決める）")
+    au.add_argument("--period", action="append", help="名前:最初の日:最後の日（最初の期間で混ぜ方を決める）")
+    au.add_argument("--morning", action="store_true", help="朝の取り込みのオッズが残っている日で、朝のオッズと確定オッズを比べる")
     au.add_argument("--sims", type=int, default=10000)
+    au.add_argument("--script", default="audit.js", choices=["audit.js", "place.js"],
+                    help="audit.js：シミュレーションの精査 / place.js：複勝の買い候補の検証")
     au.add_argument("--data", default=str(ROOT / "data"))
     va = sub.add_parser("value")
     for k in ("--train-start", "--train-end", "--test-start", "--test-end"):

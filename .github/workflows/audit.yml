@@ -1,5 +1,7 @@
 name: シミュレーションの精査
 
+# script=place.js で、複勝の買い候補（期待値1.0以上・下限3倍まで）の検証もできる
+
 # 控えにある過去のレース結果で、シミュレーションが正しく動いているか・オッズにない情報があるかを調べる。
 # 最初の期間で「オッズとシミュレーションの混ぜ方」を決め、ほかの期間で確かめる。
 # JRA にはアクセスせず、控えも書き換えないので、取り込み（過去のレースで検証）と同時に動かせる。ログには集計の数字だけを出す
@@ -12,6 +14,13 @@ on:
       sims:
         description: "1レースあたりのシミュレーション回数"
         default: "10000"
+      script:
+        description: "audit.js（シミュレーションの精査）/ place.js（複勝の買い候補の検証）"
+        default: "audit.js"
+      morning:
+        description: "期間の代わりに、朝の取り込みのオッズが残っている日で「朝のオッズ」と「確定オッズ」を比べる（確定オッズは控えから。先に「過去のレースで検証」でその日まで取り込んでおく）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,4 +47,8 @@ jobs:
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           PERIODS: ${{ inputs.periods }}
           SIMS: ${{ inputs.sims }}
-        run: python -m keiba audit --sims "$SIMS" $(for p in $PERIODS; do echo --period "$p"; done)
+          MORNING: ${{ inputs.morning }}
+          SCRIPT: ${{ inputs.script }}
+        run: |
+          if [ "$MORNING" = "true" ]; then python -m keiba audit --script "$SCRIPT" --sims "$SIMS" --morning
+          else python -m keiba audit --script "$SCRIPT" --sims "$SIMS" $(for p in $PERIODS; do echo --period "$p"; done); fi
