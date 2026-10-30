@@ -54,8 +54,9 @@ function loglik(data, th) {
   }
   return { ll: ll / data.length, g: g.map((v) => v / data.length) };
 }
-function fit(data, free) {
-  const th = [1, 0], m = [0, 0], v = [0, 0];
+// init はオッズの重み・シミュの重みの初期値（free が false の重みはそのまま）
+function fit(data, free, init = [1, 0]) {
+  const th = init.slice(), m = [0, 0], v = [0, 0];
   for (let it = 1; it <= 3000; it++) {
     const { g } = loglik(data, th);
     for (let k = 0; k < 2; k++) {
@@ -127,7 +128,8 @@ const dTest = dataset(read(process.argv[4]), read(process.argv[5]));
 console.log(`オッズのあるレース（新馬戦を除く）：調整用 ${dTrain.length} / 確認用 ${dTest.length}`);
 const thMkt = fit(dTrain, [true, false]);
 const thMix = fit(dTrain, [true, true]);
-const thSim = [0, fit(dTrain, [false, true])[1]];
+// シミュだけ：オッズの重みは 0 のまま（以前は 1 のままシミュの重みを決めていた）
+const thSim = fit(dTrain, [false, true], [0, 0]);
 console.log("\n勝ち馬の当てはまり（大きいほど良い） | 調整用 | 確認用 | 重み（オッズ, シミュ）");
 for (const [name, th] of [["オッズだけ", thMkt], ["シミュだけ", thSim], ["オッズ＋シミュ", thMix]]) {
   console.log([name, loglik(dTrain, th).ll.toFixed(4), loglik(dTest, th).ll.toFixed(4), th.map((v) => v.toFixed(3)).join(", ")].join(" | "));

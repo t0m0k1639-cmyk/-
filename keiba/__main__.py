@@ -450,6 +450,27 @@ def cmd_value(args) -> int:
     return 0
 
 
+def cmd_audit(args) -> int:
+    """シミュレーションの精査（keiba/audit.js）。最初の期間で混ぜ方を決め、ほかの期間で確かめる。数字だけを出す。"""
+    password = page_password()
+    if not password:
+        log.error("パスワードがありません")
+        return 2
+    cache = backtest.load_cache(Path(args.data), password)
+    labels, paths = [], []
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, spec in enumerate(args.period):
+            label, start, end = spec.split(":")
+            day, res = backtest.build_eval_input(cache, date.fromisoformat(start), date.fromisoformat(end))
+            for suffix, obj in (("day", day), ("res", res)):
+                (Path(tmp) / f"{i}_{suffix}.json").write_text(json.dumps(obj, ensure_ascii=False))
+                paths.append(f"{tmp}/{i}_{suffix}.json")
+            labels.append(f"{label}（{start}〜{end}）")
+        print(subprocess.run(["node", str(ROOT / "keiba" / "audit.js"), *paths], capture_output=True, text=True, check=True,
+                             env=dict(os.environ, LABELS=",".join(labels), SIMS=str(args.sims))).stdout)
+    return 0
+
+
 def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="keiba")
@@ -484,6 +505,10 @@ def main(argv=None) -> int:
     tu.add_argument("--sims", type=int, default=10000)
     tu.add_argument("--tune-sims", type=int, default=2000)
     tu.add_argument("--data", default=str(ROOT / "data"))
+    au = sub.add_parser("audit")
+    au.add_argument("--period", action="append", required=True, help="名前:最初の日:最後の日（最初の期間で混ぜ方を決める）")
+    au.add_argument("--sims", type=int, default=10000)
+    au.add_argument("--data", default=str(ROOT / "data"))
     va = sub.add_parser("value")
     for k in ("--train-start", "--train-end", "--test-start", "--test-end"):
         va.add_argument(k, required=True)
@@ -496,7 +521,7 @@ def main(argv=None) -> int:
     b.add_argument("--out", default="_site")
     b.add_argument("--data", default=str(ROOT / "data"))
     args = p.parse_args(argv)
-    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "tune": cmd_tune, "value": cmd_value, "sample": cmd_sample,
+    return {"run": cmd_run, "refresh": cmd_refresh, "evaluate": cmd_evaluate, "backtest": cmd_backtest, "tune": cmd_tune, "audit": cmd_audit, "value": cmd_value, "sample": cmd_sample,
             "build-site": cmd_build_site}[args.cmd](args)
 
 

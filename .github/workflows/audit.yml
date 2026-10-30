@@ -1,0 +1,41 @@
+name: シミュレーションの精査
+
+# 控えにある過去のレース結果で、シミュレーションが正しく動いているか・オッズにない情報があるかを調べる。
+# 最初の期間で「オッズとシミュレーションの混ぜ方」を決め、ほかの期間で確かめる。
+# JRA にはアクセスせず、控えも書き換えないので、取り込み（過去のレースで検証）と同時に動かせる。ログには集計の数字だけを出す
+on:
+  workflow_dispatch:
+    inputs:
+      periods:
+        description: "名前:最初の日:最後の日 をスペース区切り（最初の期間で混ぜ方を決める）"
+        default: "調整用:2025-10-01:2026-06-30 確認用:2026-07-01:2026-10-25"
+      sims:
+        description: "1レースあたりのシミュレーション回数"
+        default: "10000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 精査する
+        env:
+          PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
+          PERIODS: ${{ inputs.periods }}
+          SIMS: ${{ inputs.sims }}
+        run: python -m keiba audit --sims "$SIMS" $(for p in $PERIODS; do echo --period "$p"; done)
