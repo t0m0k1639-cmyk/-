@@ -845,7 +845,7 @@
 
   async function unlock(password, remember) {
     state.password = password;
-    // 前日昼に翌日分を取り込むので、当日のレースが終わる17時までは当日分を先に開く
+    // 前日の朝に翌日分を取り込むので、当日のレースが終わる17時までは当日分を先に開く
     const now = new Date(Date.now() + 9 * 3600e3);
     const today = now.toISOString().slice(0, 10);
     const first = state.dates.includes(today) && now.getUTCHours() < 17 ? today : null;

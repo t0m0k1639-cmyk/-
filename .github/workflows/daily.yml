@@ -5,8 +5,9 @@ on:
     # GitHub の cron は UTC。開催日かどうかはスクリプト側で判定する
     # 毎朝 7:30 JST（UTC では前日22:30）にその日の分。日中はページの更新ボタンで1レースずつ取り直す
     - cron: "30 22 * * *"
-    # 毎日 12:07 JST（UTC 3:07）に翌日の分を先に取り込む（オッズは前日発売分、馬体重は当日朝に取り直す）
-    - cron: "7 3 * * *"
+    # 毎朝 8:07 JST（UTC では前日23:07）に翌日の分を先に取り込む。当日分（7:30）のあとにずらしている
+    # （オッズは前日発売があれば入る。馬体重は当日朝に取り直す）
+    - cron: "7 23 * * *"
   workflow_dispatch:
     inputs:
       date:
@@ -49,7 +50,7 @@ jobs:
           KEIBA_CONTACT: ${{ vars.KEIBA_CONTACT }}
           PAGE_PASSWORD: ${{ secrets.PAGE_PASSWORD }}
           TARGET_DATE: ${{ inputs.date }}
-          EVENING: ${{ github.event.schedule == '7 3 * * *' }}
+          EVENING: ${{ github.event.schedule == '7 23 * * *' }}
         run: |
           if [ "$EVENING" = "true" ]; then TARGET_DATE=$(TZ=Asia/Tokyo date -d tomorrow +%F); fi
           python -m keiba run ${TARGET_DATE:+--date "$TARGET_DATE"}
