@@ -429,6 +429,9 @@
       } else if (res.noData) {
         warn.push(el("p", "sim-warn", `前走データがない馬が${res.noData}頭います。その馬は平均扱いで計算しています。`));
       }
+      if (res.markBasis !== "mix") {
+        warn.push(el("p", "sim-info", "オッズがまだ出ていない（または一部の馬にない）ので、印はシミュの複勝率だけで付けています（上位3頭に◎○▲、ほかは20%以上に☆△、15%以上に注）。オッズが出たら「このレースを最新にする」で取り直すと、オッズとの平均で付け直します。"));
+      }
       const head = el("p", "sim-head",
         `${res.course}・馬場${res.going}${res.goingNote ? `（${res.goingNote}）` : ""}${res.bias ? `・馬場の傾向 ${res.bias}` : ""}・ペース予想 ${res.pace}（逃げ${res.nige}頭・先行${res.sen}頭）・${res.sims.toLocaleString()}回`);
       const wrap = el("div", "sim-wrap");

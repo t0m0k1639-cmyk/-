@@ -7,8 +7,8 @@
   const STYLE_NAMES = ["逃げ", "先行", "差し", "追込"];
   const STYLE_FRONT = [1, 0.66, 0.33, 0];
   const MARKS = ["◎", "○", "▲", "☆", "△"];
-  // オッズがあるときの印：シミュの複勝率とオッズから見た複勝率の平均で並べ、上位3頭に◎○▲、
-  // 残りは平均が strong 以上なら☆（1頭目）・△、weak 以上なら注。それより下は印なし。
+  // 印：シミュの複勝率とオッズから見た複勝率の平均（オッズの発売前はシミュの複勝率だけ）で並べ、上位3頭に◎○▲、
+  // 残りは strong 以上なら☆（1頭目）・△、weak 以上なら注。それより下は印なし。
   // 2026/10 の検証（新馬戦を除く8頭以上・3,153レース）で、印の数を固定した5頭BOXより
   // 「複勝率20%以上」で印をつけた方が3連複の的中率・回収率とも良く、15%以上は軸からの流しなら使えた。
   const MARK_RULE = { strong: 0.2, weak: 0.15 };
@@ -384,16 +384,18 @@
       const pm = harville3(odds.map((o) => 1 / o / inv));
       rows.forEach((r, i) => { r.p3mkt = pm[i]; r.p3mix = (r.top3 + pm[i]) / 2; });
       rows.sort((a, b) => b.p3mix - a.p3mix || b.win - a.win);
-      let star = false;
-      rows.forEach((r, i) => {
-        if (i < 3) r.mark = MARKS[i];
-        else if (r.p3mix >= MARK_RULE.strong) { r.mark = star ? "△" : "☆"; star = true; }
-        else r.mark = r.p3mix >= MARK_RULE.weak ? "注" : "";
-      });
       markBasis = "mix";
     } else {
-      rows.forEach((r, i) => (r.mark = MARKS[i] || ""));
+      // オッズの発売前（前日の取り込みなど）は、シミュの複勝率だけで同じ付け方にする
+      rows.sort((a, b) => b.top3 - a.top3 || b.win - a.win);
     }
+    let star = false;
+    rows.forEach((r, i) => {
+      const p3 = markBasis === "mix" ? r.p3mix : r.top3;
+      if (i < 3) r.mark = MARKS[i];
+      else if (p3 >= MARK_RULE.strong) { r.mark = star ? "△" : "☆"; star = true; }
+      else r.mark = p3 >= MARK_RULE.weak ? "注" : "";
+    });
     // 3連複の買い目：◎を軸に、ほかの印の馬すべてへ流す
     const others = rows.slice(1).filter((r) => r.mark).map((r) => r.h.num);
     const trio = n >= 3 && others.length >= 2 ? { axis: rows[0].h.num, partners: others, points: others.length * (others.length - 1) / 2 } : null;
