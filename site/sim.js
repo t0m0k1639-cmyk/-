@@ -7,6 +7,11 @@
   const STYLE_NAMES = ["逃げ", "先行", "差し", "追込"];
   const STYLE_FRONT = [1, 0.66, 0.33, 0];
   const MARKS = ["◎", "○", "▲", "☆", "△"];
+  // オッズがあるときの印：シミュの複勝率とオッズから見た複勝率の平均で並べ、上位3頭に◎○▲、
+  // 残りは平均が strong 以上なら☆（1頭目）・△、weak 以上なら注。それより下は印なし。
+  // 2026/10 の検証（新馬戦を除く8頭以上・3,153レース）で、印の数を固定した5頭BOXより
+  // 「複勝率20%以上」で印をつけた方が3連複の的中率・回収率とも良く、15%以上は軸からの流しなら使えた。
+  const MARK_RULE = { strong: 0.2, weak: 0.15 };
 
   // 直線(m)・1周(m)・坂(0平坦/1小さい坂/2急坂)の目安
   const VENUES = {
@@ -354,6 +359,7 @@
     const n = hs.length;
     hs.forEach((h, i) => {
       h.gate = n > 1 ? i / (n - 1) : 0;
+      h.odds = running[i].odds;
       h.manual = (opts.manual || {})[h.num] || 0;
       if (h.manual) h.notes.unshift(`自分の補正${h.manual > 0 ? "+" : ""}${h.manual}`);
       h.train = (opts.train || {})[h.num] || "";
@@ -371,7 +377,26 @@
     }
     const rows = hs.map((h, i) => ({ h, win: win[i] / N, top2: top2[i] / N, top3: top3[i] / N, avg: sumR[i] / N }));
     rows.sort((a, b) => b.win - a.win || b.top3 - a.top3);
-    rows.forEach((r, i) => (r.mark = MARKS[i] || ""));
+    const odds = rows.map((r) => r.h.odds);
+    let markBasis = "sim";
+    if (n >= 5 && odds.every((o) => o > 0)) {
+      const inv = odds.reduce((a, o) => a + 1 / o, 0);
+      const pm = harville3(odds.map((o) => 1 / o / inv));
+      rows.forEach((r, i) => { r.p3mkt = pm[i]; r.p3mix = (r.top3 + pm[i]) / 2; });
+      rows.sort((a, b) => b.p3mix - a.p3mix || b.win - a.win);
+      let star = false;
+      rows.forEach((r, i) => {
+        if (i < 3) r.mark = MARKS[i];
+        else if (r.p3mix >= MARK_RULE.strong) { r.mark = star ? "△" : "☆"; star = true; }
+        else r.mark = r.p3mix >= MARK_RULE.weak ? "注" : "";
+      });
+      markBasis = "mix";
+    } else {
+      rows.forEach((r, i) => (r.mark = MARKS[i] || ""));
+    }
+    // 3連複の買い目：◎を軸に、ほかの印の馬すべてへ流す
+    const others = rows.slice(1).filter((r) => r.mark).map((r) => r.h.num);
+    const trio = n >= 3 && others.length >= 2 ? { axis: rows[0].h.num, partners: others, points: others.length * (others.length - 1) / 2 } : null;
     const ap = autoPace(hs);
     const spec = m.ce.spec;
     const course = spec.straight ? "直線1000m" :
@@ -380,7 +405,7 @@
     const goingLabel = cfg.surface === "dirt" && Number.isFinite(parseFloat(cfg.moist)) ? `含水率${cfg.moist}%`
       : `${cfg.going}${cfg.surface === "turf" && cfg.cushion !== "" && cfg.cushion != null ? `・クッション値${cfg.cushion}` : ""}`;
     return {
-      rows, sims: N, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
+      rows, sims: N, markBasis, trio, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
       bias: cfg.bias && cfg.bias.races ? `${cfg.bias.label}（${cfg.bias.races}レース分）` : "",
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
@@ -420,5 +445,5 @@
   }
 
   // _internal は成績の検証用（keiba/diag_sim.js）
-  window.RaceSim = { simulate, pedStats, placeValue, PLACE_RULE, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
+  window.RaceSim = { simulate, pedStats, placeValue, PLACE_RULE, MARK_RULE, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
 })();

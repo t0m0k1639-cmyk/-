@@ -99,6 +99,14 @@ const EV = [
 const ev = EV.map(([kind, name]) => ({ kind, name, n: 0, hit: 0, ret: 0, races: new Set() }));
 // ページの「買い候補（複勝）」をすべて100円ずつ買っていたら（ページに出ていた時点のオッズで判定）
 const cand = { name: "買い候補（複勝・期待値1.0以上）をすべて", cost: 0, ret: 0, hits: 0, races: 0 };
+// 印の数が変わる付け方（sim.js の MARK_RULE）で3連複を買っていたら
+const trioNagashi = { name: "3連複 ◎軸→印の馬すべて（注まで）流し", cost: 0, ret: 0, hits: 0, races: 0 };
+const trioBox = { name: "3連複 印の馬（△まで）のBOX", cost: 0, ret: 0, hits: 0, races: 0 };
+function settleTickets(b, tickets, payout) {
+  if (!tickets.length) return;
+  const ret = tickets.reduce((a, t) => a + (payout || []).filter((p) => sameSet(p.nums, t)).reduce((x, p) => x + p.yen, 0), 0);
+  b.cost += 100 * tickets.length; b.ret += ret; b.races++; if (ret) b.hits++;
+}
 const days = new Set();
 const yenOf = (list, num) => (list || []).filter((p) => p.nums.length === 1 && p.nums[0] === num).reduce((a, p) => a + p.yen, 0);
 function spearman(x, y) {
@@ -172,6 +180,9 @@ for (const r of day.races) {
   const newcomer = (r.race_class || "").includes("新馬");
   if (pay && !newcomer) {
     settle(pay, marks);
+    if (res.trio) settleTickets(trioNagashi, pairs(res.trio.partners).map((p) => [res.trio.axis, ...p]), pay.trio);
+    const strong = res.rows.filter((x) => x.mark && x.mark !== "注").map((x) => x.h.num);
+    if (strong.length >= 3) settleTickets(trioBox, triples(strong), pay.trio);
     const buys = placeValue(r).filter((x) => x.buy);
     if (buys.length) {
       const y = buys.reduce((a, x) => a + yenOf(pay.place, x.num), 0);
@@ -235,7 +246,7 @@ for (const c of calib) {
   if (c.n) console.log([`${c.lo * 100}〜${Math.min(c.hi, 1) * 100}%`, c.n, `${((100 * c.pred) / c.n).toFixed(0)}%`, `${((100 * c.hit) / c.n).toFixed(0)}%`].join(" | "));
 }
 
-if (cand.cost) bets.push(cand);
+for (const b of [trioNagashi, trioBox, cand]) if (b.cost) bets.push(b);
 if (bets.some((b) => b.races)) {
   console.log("\n買い方（100円ずつ・新馬戦を除く） | レース数 | 投資 | 払戻 | 回収率 | 的中レース");
   for (const b of bets) {

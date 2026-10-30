@@ -11,7 +11,7 @@
   state.sort = store.get("sort") || state.sort;
 
   // ---- 印とメモ（この端末にだけ保存）
-  const MARK_CYCLE = ["", "◎", "○", "▲", "△", "☆", "✕"];
+  const MARK_CYCLE = ["", "◎", "○", "▲", "△", "☆", "注", "✕"];
   let yoso = {};
   try { yoso = JSON.parse(store.get("yoso") || "{}") || {}; } catch (_) { yoso = {}; }
   const yosoKey = (r) => `${state.day.date}|${r.key}`;
@@ -386,9 +386,10 @@
   const IPAT_URL = "https://www.ipat.jra.go.jp/";
   function marksText(r, res) {
     const m = yosoOf(r).m;
-    const mine = MARK_CYCLE.slice(1, 6).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${n}`));
+    const mine = MARK_CYCLE.slice(1, -1).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${n}`));
     const picks = mine.length ? mine : res.rows.filter((x) => x.mark).map((x) => `${x.mark}${x.h.num}`);
-    return `${r.venue}${r.number}R ${raceTitle(r)}\n${picks.join(" ")}${mine.length ? "" : "（シミュレーションの予想印）"}`;
+    const trio = !mine.length && res.trio ? `\n3連複 ${res.trio.axis}軸→${res.trio.partners.join(",")} 流し ${res.trio.points}点` : "";
+    return `${r.venue}${r.number}R ${raceTitle(r)}\n${picks.join(" ")}${mine.length ? "" : "（シミュレーションの予想印）"}${trio}`;
   }
   function betBar(r, res) {
     const bar = el("div", "bet-bar");
@@ -437,7 +438,8 @@
       // 結果が出ているレースは、着順の列と的中の早見を足す
       const rv = reviewOf(r);
       const placeNum = (num) => placeOf(rv, num);
-      ["予想", "馬番", "馬名・脚質", "勝率", "連対", "複勝"].forEach((t) => htr.append(Object.assign(el("th", t === "連対" ? "s-top2" : "", t), { scope: "col" })));
+      const mix = res.markBasis === "mix";
+      ["予想", "馬番", "馬名・脚質", "勝率", "連対", mix ? "複勝 平均（シミュ/オッズ）" : "複勝"].forEach((t) => htr.append(Object.assign(el("th", t === "連対" ? "s-top2" : "", t), { scope: "col" })));
       thead.append(htr);
       const tbody = el("tbody");
       const maxW = Math.max(...res.rows.map((x) => x.win)) || 1;
@@ -455,7 +457,9 @@
         const num = el("td");
         num.append(el("span", `waku waku-${x.h.waku || 0}`, x.h.num));
         if (rv) num.append(el("span", `h-place${p && p <= 3 ? " top" : ""}`, p ? `${p}着` : "—"));
-        tr.append(el("td", "s-mark", x.mark), num, nm, w, el("td", "s-num s-top2", pct(x.top2)), el("td", "s-num", pct(x.top3)));
+        const p3 = el("td", "s-num", pct(mix ? x.p3mix : x.top3));
+        if (mix) p3.append(el("span", "s-p3sub", `${Math.round(x.top3 * 100)}/${Math.round(x.p3mkt * 100)}`));
+        tr.append(el("td", "s-mark", x.mark), num, nm, w, el("td", "s-num s-top2", pct(x.top2)), p3);
         tbody.append(tr);
       });
       table.append(thead, tbody);
@@ -470,9 +474,13 @@
         const card = document.getElementById(`r-${r.key}`);
         if (card) { card.querySelector(".race-head").click(); card.scrollIntoView({ block: "start" }); }
       });
-      const note = el("p", "sim-note", "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズと人気は使っていません。勝率は実際の結果で検証した数字ではないので、馬同士の順番と差の目安として見てください。");
+      const R = window.RaceSim.MARK_RULE;
+      const note = el("p", "sim-note", mix
+        ? `前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。印は、シミュレーションの複勝率とオッズから見た複勝率の平均で並べ、上位3頭に◎○▲、平均${R.strong * 100}%以上に☆△、${R.weak * 100}〜${R.strong * 100}%に注をつけています（過去1年の検証で、印の数を固定するより3連複の的中率・回収率が良かった付け方です）。`
+        : "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズがまだ出ていないので、印はシミュレーションだけで上位5頭につけています（オッズが出たら「最新にする」で付け直されます）。");
+      const trioLine = res.trio ? el("p", "sim-trio", `3連複のおすすめ：${circled(res.trio.axis)}軸 → ${res.trio.partners.map(circled).join(" ")} へ流し（${res.trio.points}点）`) : null;
       const check = rv ? resultCheck(rv, res.rows.map((x) => x.h.num)) : null;
-      out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, use, betBar(r, res), note);
+      out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, ...(trioLine ? [trioLine] : []), use, betBar(r, res), note);
     }, 30);
   }
 
