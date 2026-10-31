@@ -375,6 +375,10 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 }
 .adj-seg button:first-child { border-left: 0; }
 .adj-seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+/* 折り返す選択肢（調教の脚色）：線は隙間で引く */
+.adj-seg.many { gap: 0; border: 0; border-radius: 0; overflow: visible; max-width: 360px; }
+.adj-seg.many button { border: 1px solid var(--line); margin: 0 -1px -1px 0; padding: 7px 2px; font-family: inherit; }
+.adj-seg.many button:first-child { border-left: 1px solid var(--line); border-top-left-radius: 8px; }
 .adj-badge { display: inline-block; font-size: 0.6875rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-top: 2px; }
 .adj-badge.plus { background: var(--hon-soft); color: var(--hon); }
 .adj-badge.minus { background: var(--err-bg); color: var(--err-fg); }

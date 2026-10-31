@@ -62,7 +62,13 @@
   const BIAS_FRONT = 3, BIAS_POST = 2;
   // 調教評価と脚色（以前のシミュレーターと同じ点数）。JRA公式には調教のデータがないので、自分で入れる
   const TRAIN = { A: 2, B: 1, C: 0, D: -2 };
-  const KAKU = { "馬なり": 0.5, "G前仕掛け": 0.25, "強め": 0, "一杯": -0.5 };
+  // 脚色は「楽に動けたほど良い」の順に、以前のシミュレーターの4つ（馬なり +0.5・G前仕掛け +0.25・強め 0・一杯 −0.5）の間に置く。
+  // 「末・G前」は終いだけ、「直」は直線ずっと、無印は全体を通しての追い方。どれも検証した値ではない
+  const KAKU = {
+    "馬なり余力": 0.5, "馬なり": 0.5, "仕掛け": 0.25, "G前仕掛け": 0.25,
+    "末強め": 0, "G前強め": 0, "直強め": 0, "強め": 0,
+    "末一杯": -0.25, "G前一杯": -0.25, "直一杯": -0.5, "一杯": -0.5, "叩き一杯": -0.5,
+  };
   const JK_TOP = ["C.ルメール", "川田将雅", "戸崎圭太", "横山武史", "坂井瑠星", "武豊", "岩田望来", "松山弘平", "鮫島克駿", "西村淳也", "横山和生", "北村友一", "菅原明良", "佐々木大輔"];
 
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -447,5 +453,5 @@
   }
 
   // _internal は成績の検証用（keiba/diag_sim.js）
-  window.RaceSim = { simulate, pedStats, placeValue, PLACE_RULE, MARK_RULE, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
+  window.RaceSim = { simulate, KAKU, pedStats, placeValue, PLACE_RULE, MARK_RULE, STYLE_NAMES, MARKS, _internal: { features, terms, buildModel, configFor, classBase, toSec, PARAMS, TERMS } };
 })();

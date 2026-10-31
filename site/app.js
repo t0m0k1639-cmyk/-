@@ -221,11 +221,12 @@
     else ul.append(el("li", "", "前走のデータはありません（新馬など）"));
 
     // 調教・脚色・自分の補正（シミュレーションに反映）。field は yoso の項目名、空の値は「入れていない」
-    const segBox = (label, field, options, none = "") => {
+    const segBox = (label, field, options, none = "", cols = 0) => {
       const box = el("div", "adj");
       box.append(el("span", "adj-label", label));
-      const seg = el("div", "adj-seg");
-      seg.style.gridTemplateColumns = `repeat(${options.length}, minmax(0, 1fr))`;
+      // 選択肢が多いときは cols 個ずつで折り返す
+      const seg = el("div", cols ? "adj-seg many" : "adj-seg");
+      seg.style.gridTemplateColumns = `repeat(${cols || options.length}, minmax(0, 1fr))`;
       for (const [v, text] of options) {
         const b = Object.assign(el("button", "", text), { type: "button" });
         b.setAttribute("aria-pressed", String((yosoOf(r)[field][h.number] || none) === v));
@@ -245,7 +246,8 @@
     if (!h.scratched) {
       td.append(
         segBox("調教評価（以前のシミュレーターと同じ：A +2・B +1・C 0・D −2）", "tr", [["", "—"], ["A", "A"], ["B", "B"], ["C", "C"], ["D", "D"]]),
-        segBox("調教の脚色", "kk", [["", "—"], ["馬なり", "馬なり"], ["G前仕掛け", "G前"], ["強め", "強め"], ["一杯", "一杯"]]),
+        segBox("調教の脚色（馬なり +0.5・仕掛け +0.25・強め 0・末/G前一杯 −0.25・一杯 −0.5）", "kk",
+          [["", "—"], ...Object.keys(window.RaceSim.KAKU).map((k) => [k, k])], "", 4),
         segBox("自分の補正", "adj", [[-2, "-2"], [-1, "-1"], [0, "±0"], [1, "+1"], [2, "+2"]], 0),
       );
     }
