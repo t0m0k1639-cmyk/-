@@ -22,6 +22,15 @@
       <select id="date"></select>
     </label>
   </div>
+  <!-- 1レースだけを見ているときの帯（一覧へ戻る・前後のレース） -->
+  <div id="focus-bar" class="bar-inner focus-bar" hidden>
+    <button type="button" id="focus-back" class="focus-back">← レース一覧</button>
+    <span id="focus-title" class="focus-title"></span>
+    <span class="focus-nav">
+      <button type="button" id="focus-prev" aria-label="前のレース">‹ 前</button>
+      <button type="button" id="focus-next" aria-label="次のレース">次 ›</button>
+    </span>
+  </div>
 </header>
 
 <main class="wrap">

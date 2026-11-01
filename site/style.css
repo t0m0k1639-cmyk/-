@@ -149,6 +149,20 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 }
 .chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 
+/* 1レースだけを見ているとき：一覧・狙い目・買い候補などを隠し、選んだレースだけを出す */
+body.focus #top, body.focus #buy, body.focus #review, body.focus #batch,
+body.focus .controls, body.focus .howto { display: none !important; }
+body.focus #races > li:not(.focused) { display: none; }
+.focus-bar { gap: 8px; padding-block: 6px; border-top: 1px solid var(--line); }
+.focus-bar button {
+  font: inherit; font-size: var(--step--1); border: 1px solid var(--line); background: var(--surface);
+  color: var(--fg); border-radius: 999px; padding: 5px 12px; cursor: pointer; white-space: nowrap;
+}
+.focus-bar button:disabled { opacity: 0.35; cursor: default; }
+.focus-back { border-color: var(--accent) !important; color: var(--accent) !important; font-weight: 700; }
+.focus-title { flex: 1; min-width: 0; font-weight: 700; font-size: var(--step--1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-nav { display: flex; gap: 4px; }
+
 /* レース一覧 */
 .races { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .race { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); scroll-margin-top: 80px; }

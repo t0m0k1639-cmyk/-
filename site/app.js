@@ -628,12 +628,60 @@
 
     const head = node.querySelector(".race-head");
     const detail = node.querySelector(".race-detail");
-    head.addEventListener("click", () => {
-      const open = head.getAttribute("aria-expanded") === "true";
-      head.setAttribute("aria-expanded", String(!open));
-      detail.hidden = open;
-    });
+    // 押すとそのレースだけの画面にする（applyFocus が開いた状態にする）
+    head.addEventListener("click", () => openRace(r.key));
     return node;
+  }
+
+  // ---- 1レースだけの画面（アドレスの #r-東京-10）。一覧はそのまま残し、戻ると元の位置に戻る。
+  // スマホの「戻る」でも一覧に戻れるように、開くときだけ履歴を1つ足す（前後のレースへは置き換え）
+  const focus = { listY: 0, shown: null, pushed: false };
+  const focusKey = () => { const m = decodeURIComponent(location.hash).match(/^#r-(.+)$/); return m ? m[1] : null; };
+  function openRace(key, replace = false) {
+    if (focusKey() === key) { applyFocus(); return; }
+    if (!focusKey()) { focus.listY = window.scrollY; focus.pushed = true; }
+    if (replace) { history.replaceState(null, "", `#r-${key}`); applyFocus(); }
+    else location.hash = `r-${key}`;   // hashchange で applyFocus
+  }
+  function closeRace() {
+    if (!focusKey()) return;
+    if (focus.pushed) { focus.pushed = false; history.back(); return; }   // 戻ると hashchange で applyFocus
+    history.replaceState(null, "", location.pathname + location.search);
+    applyFocus();
+  }
+  function applyFocus() {
+    const key = focusKey();
+    const r = key && state.day ? state.day.races.find((x) => x.key === key) : null;
+    document.body.classList.toggle("focus", !!r);
+    $("focus-bar").hidden = !r;
+    if (!r) {
+      if (focus.shown) {
+        // 一覧に戻る：開いていたレースを閉じて、元の位置へ
+        const card = document.getElementById(`r-${focus.shown}`);
+        if (card) { card.classList.remove("focused"); card.querySelector(".race-head").setAttribute("aria-expanded", "false"); card.querySelector(".race-detail").hidden = true; }
+        focus.shown = null;
+        window.scrollTo(0, focus.listY);
+      }
+      return;
+    }
+    let card = document.getElementById(`r-${key}`);
+    if (!card) {   // 競馬場で絞っていて一覧にないときは「すべて」に戻す（renderList がまた applyFocus を呼ぶ）
+      if (state.venue === "すべて") return;
+      state.venue = "すべて";
+      renderList();
+      return;
+    }
+    document.querySelectorAll("#races > li").forEach((li) => li.classList.toggle("focused", li === card));
+    card.querySelector(".race-head").setAttribute("aria-expanded", "true");
+    card.querySelector(".race-detail").hidden = false;
+    $("focus-title").textContent = `${r.venue}${r.number}R ${raceTitle(r)}`;
+    const list = sorted(state.day.races), i = list.findIndex((x) => x.key === key);
+    const prev = list[i - 1], next = list[i + 1];
+    $("focus-prev").disabled = !prev;
+    $("focus-next").disabled = !next;
+    $("focus-prev").onclick = () => prev && openRace(prev.key, true);
+    $("focus-next").onclick = () => next && openRace(next.key, true);
+    if (focus.shown !== key) { focus.shown = key; window.scrollTo(0, 0); }
   }
 
   function sorted(races) {
@@ -653,6 +701,7 @@
       return;
     }
     ul.replaceChildren(...list.map(renderRace));
+    applyFocus();
   }
 
   function renderOddsToggle() {
@@ -813,6 +862,10 @@
   }
 
   function showDay(day) {
+    if (state.day && state.day.date !== day.date && focusKey()) {   // 日付を変えたら一覧から
+      history.replaceState(null, "", location.pathname + location.search);
+      focus.pushed = false; focus.shown = null;
+    }
     state.day = day;
     $("date").value = day.date;
     const status = state.status;
@@ -860,6 +913,15 @@
   }
 
   async function init() {
+    window.addEventListener("hashchange", applyFocus);
+    $("focus-back").addEventListener("click", closeRace);
+    // 狙い目・買い候補のリンク（#r-東京-10）も、1レースの画面で開く
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href^="#r-"]');
+      if (!a) return;
+      e.preventDefault();
+      openRace(decodeURIComponent(a.getAttribute("href").slice(3)));
+    });
     document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
       state.sort = b.dataset.sort;
       store.set("sort", state.sort);
