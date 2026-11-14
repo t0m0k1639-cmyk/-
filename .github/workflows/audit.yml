@@ -15,7 +15,7 @@ on:
         description: "1レースあたりのシミュレーション回数"
         default: "10000"
       script:
-        description: "audit.js（シミュレーションの精査）/ place.js（複勝の買い候補の検証）"
+        description: "audit.js（シミュレーションの精査）/ place.js（複勝の買い候補の検証）/ factors.js（足す候補の要素の検証。期間は1つ）"
         default: "audit.js"
       morning:
         description: "期間の代わりに、朝の取り込みのオッズが残っている日で「朝のオッズ」と「確定オッズ」を比べる（確定オッズは控えから。先に「過去のレースで検証」でその日まで取り込んでおく）"

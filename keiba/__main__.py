@@ -560,8 +560,8 @@ def main(argv=None) -> int:
     au.add_argument("--period", action="append", help="名前:最初の日:最後の日（最初の期間で混ぜ方を決める）")
     au.add_argument("--morning", action="store_true", help="朝の取り込みのオッズが残っている日で、朝のオッズと確定オッズを比べる")
     au.add_argument("--sims", type=int, default=10000)
-    au.add_argument("--script", default="audit.js", choices=["audit.js", "place.js"],
-                    help="audit.js：シミュレーションの精査 / place.js：複勝の買い候補の検証")
+    au.add_argument("--script", default="audit.js", choices=["audit.js", "place.js", "factors.js"],
+                    help="audit.js：シミュレーションの精査 / place.js：複勝の買い候補の検証 / factors.js：足す候補の要素の検証（期間は1つ。2025-10-01 より前で決めて以降で確かめる）")
     au.add_argument("--data", default=str(ROOT / "data"))
     va = sub.add_parser("value")
     for k in ("--train-start", "--train-end", "--test-start", "--test-end"):
