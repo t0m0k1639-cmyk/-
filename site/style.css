@@ -132,6 +132,9 @@ main.wrap { display: grid; gap: 16px; padding-block: 16px 32px; }
 
 .s-p3sub { display: block; font-size: 0.625rem; color: var(--muted); white-space: nowrap; }
 .sim-trio { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius); background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: var(--step--1); }
+.sim-trio p { margin: 0; }
+.sim-trio p + p { margin-top: 4px; }
+.sim-trio .sim-trio-sub { font-weight: 400; color: var(--muted); font-size: 0.6875rem; }
 
 /* 操作 */
 .controls { display: grid; gap: 10px; }

@@ -102,6 +102,7 @@ const cand = { name: "買い候補（複勝・期待値1.0以上）をすべて"
 // 印の数が変わる付け方（sim.js の MARK_RULE）で3連複を買っていたら
 const trioNagashi = { name: "3連複 ◎軸→印の馬すべて（注まで）流し", cost: 0, ret: 0, hits: 0, races: 0 };
 const trioBox = { name: "3連複 印の馬（△まで）のBOX", cost: 0, ret: 0, hits: 0, races: 0 };
+const trioForm = { name: "3連複 フォーメーション ◎○→◎○▲☆→印の馬すべて", cost: 0, ret: 0, hits: 0, races: 0 };
 function settleTickets(b, tickets, payout) {
   if (!tickets.length) return;
   const ret = tickets.reduce((a, t) => a + (payout || []).filter((p) => sameSet(p.nums, t)).reduce((x, p) => x + p.yen, 0), 0);
@@ -181,6 +182,7 @@ for (const r of day.races) {
   if (pay && !newcomer) {
     settle(pay, marks);
     if (res.trio) settleTickets(trioNagashi, pairs(res.trio.partners).map((p) => [res.trio.axis, ...p]), pay.trio);
+    if (res.trioForm) settleTickets(trioForm, res.trioForm.tickets, pay.trio);
     const strong = res.rows.filter((x) => x.mark && x.mark !== "注").map((x) => x.h.num);
     if (strong.length >= 3) settleTickets(trioBox, triples(strong), pay.trio);
     const buys = placeValue(r).filter((x) => x.buy);
@@ -246,7 +248,7 @@ for (const c of calib) {
   if (c.n) console.log([`${c.lo * 100}〜${Math.min(c.hi, 1) * 100}%`, c.n, `${((100 * c.pred) / c.n).toFixed(0)}%`, `${((100 * c.hit) / c.n).toFixed(0)}%`].join(" | "));
 }
 
-for (const b of [trioNagashi, trioBox, cand]) if (b.cost) bets.push(b);
+for (const b of [trioNagashi, trioForm, trioBox, cand]) if (b.cost) bets.push(b);
 if (bets.some((b) => b.races)) {
   console.log("\n買い方（100円ずつ・新馬戦を除く） | レース数 | 投資 | 払戻 | 回収率 | 的中レース");
   for (const b of bets) {

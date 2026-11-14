@@ -390,7 +390,8 @@
     const m = yosoOf(r).m;
     const mine = MARK_CYCLE.slice(1, -1).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map((n) => `${mk}${n}`));
     const picks = mine.length ? mine : res.rows.filter((x) => x.mark).map((x) => `${x.mark}${x.h.num}`);
-    const trio = !mine.length && res.trio ? `\n3連複 ${res.trio.axis}軸→${res.trio.partners.join(",")} 流し ${res.trio.points}点` : "";
+    const trio = (!mine.length && res.trio ? `\n3連複 ${res.trio.axis}軸→${res.trio.partners.join(",")} 流し ${res.trio.points}点` : "")
+      + (!mine.length && res.trioForm ? `\n3連複 フォーメーション ${res.trioForm.cols.map((c) => c.join(",")).join(" → ")} ${res.trioForm.points}点` : "");
     return `${r.venue}${r.number}R ${raceTitle(r)}\n${picks.join(" ")}${mine.length ? "" : "（シミュレーションの予想印）"}${trio}`;
   }
   function betBar(r, res) {
@@ -483,7 +484,13 @@
       const note = el("p", "sim-note", mix
         ? `前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。印は、シミュレーションの複勝率とオッズから見た複勝率の平均で並べ、上位3頭に◎○▲、平均${R.strong * 100}%以上に☆△、${R.weak * 100}〜${R.strong * 100}%に注をつけています（過去1年の検証で、印の数を固定するより3連複の的中率・回収率が良かった付け方です）。`
         : "前走〜4走前の着差・クラス・通過順・上がりから能力と脚質を出し、コースと馬場の補正をかけて走らせています。オッズがまだ出ていないので、印はシミュレーションだけで上位5頭につけています（オッズが出たら「最新にする」で付け直されます）。");
-      const trioLine = res.trio ? el("p", "sim-trio", `3連複のおすすめ：${circled(res.trio.axis)}軸 → ${res.trio.partners.map(circled).join(" ")} へ流し（${res.trio.points}点）`) : null;
+      const trioLine = res.trio || res.trioForm ? el("div", "sim-trio") : null;
+      if (res.trio) trioLine.append(el("p", "", `3連複のおすすめ（流し）：${circled(res.trio.axis)}軸 → ${res.trio.partners.map(circled).join(" ")}（${res.trio.points}点）`));
+      if (res.trioForm) {
+        const [a, b, c] = res.trioForm.cols.map((col) => col.map(circled).join(" "));
+        trioLine.append(el("p", "", `3連複のおすすめ（フォーメーション）：1列目 ${a} → 2列目 ${b} → 3列目 ${c}（${res.trioForm.points}点）`),
+          el("p", "sim-trio-sub", "1列目は◎○、2列目は◎○▲☆、3列目は印の馬すべて（注まで）。◎か○のどちらかが3着以内に来れば当たる形で、流しより点数は増えます。"));
+      }
       const check = rv ? resultCheck(rv, res.rows.map((x) => x.h.num)) : null;
       out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, ...(trioLine ? [trioLine] : []), use, betBar(r, res), note);
     }, 30);

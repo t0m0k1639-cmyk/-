@@ -405,6 +405,14 @@
     // 3連複の買い目：◎を軸に、ほかの印の馬すべてへ流す
     const others = rows.slice(1).filter((r) => r.mark).map((r) => r.h.num);
     const trio = n >= 3 && others.length >= 2 ? { axis: rows[0].h.num, partners: others, points: others.length * (others.length - 1) / 2 } : null;
+    // 3連複のフォーメーション：1列目 ◎○、2列目 ◎○▲☆、3列目 印の馬すべて（注まで）。同じ組み合わせは1点に数える
+    const colA = rows.slice(0, 2).map((r) => r.h.num);
+    const colB = rows.filter((r) => ["◎", "○", "▲", "☆"].includes(r.mark)).map((r) => r.h.num);
+    const colC = rows.filter((r) => r.mark).map((r) => r.h.num);
+    const formTickets = [...new Set(colA.flatMap((a) => colB.flatMap((b) => colC
+      .filter((c) => a !== b && a !== c && b !== c).map((c) => [a, b, c].sort((x, y) => x - y).join("-")))))]
+      .map((k) => k.split("-").map(Number));
+    const trioForm = n >= 3 && formTickets.length ? { cols: [colA, colB, colC], tickets: formTickets, points: formTickets.length } : null;
     const ap = autoPace(hs);
     const spec = m.ce.spec;
     const course = spec.straight ? "直線1000m" :
@@ -413,7 +421,7 @@
     const goingLabel = cfg.surface === "dirt" && Number.isFinite(parseFloat(cfg.moist)) ? `含水率${cfg.moist}%`
       : `${cfg.going}${cfg.surface === "turf" && cfg.cushion !== "" && cfg.cushion != null ? `・クッション値${cfg.cushion}` : ""}`;
     return {
-      rows, sims: N, markBasis, trio, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
+      rows, sims: N, markBasis, trio, trioForm, course, going: goingLabel, goingNote: ge.txt.join("・"), noData, byPedigree,
       bias: cfg.bias && cfg.bias.races ? `${cfg.bias.label}（${cfg.bias.races}レース分）` : "",
       pace: { S: "スロー", M: "ミドル", H: "ハイ" }[m.pace], nige: ap.nige, sen: ap.sen,
     };
