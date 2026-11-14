@@ -290,3 +290,20 @@ def test_parse_odds_table():
     <tr><td class="waku"><img alt="枠2"/></td><td class="num">2</td><td class="horse">ウマB</td><td class="odds_tan">1,234.0</td><td class="odds_fuku">45.0-120.3</td></tr>
     <tr><td class="waku"><img alt="枠3"/></td><td class="num">3</td><td class="horse">ウマC</td><td>取消</td><td></td></tr></table>"""
     assert parse_odds_table(html) == {1: {"win": 12.5, "place": [2.1, 3.4]}, 2: {"win": 1234.0, "place": [45.0, 120.3]}}
+
+
+PAIR_HTML = """<table class="basic narrow-xy umaren"><caption>1</caption>
+<tr><th scope="row">2</th><td>167.9</td></tr>
+<tr><th scope="row">3</th><td><strong class="red">4.4</strong></td></tr>
+<tr><th scope="row">4</th><td>取消</td></tr></table>
+<table class="basic narrow-xy umaren"><caption>2</caption>
+<tr><th scope="row">3</th><td>1,234.5</td></tr></table>
+<table class="basic narrow-xy wide"><caption>1</caption>
+<tr><th scope="row">3</th><td class="odds"><span class="inner"><span class="min">2.3</span><span class="cap">-</span><span class="max">2.5</span></span></td></tr>
+<tr><th scope="row">4</th><td class="odds">取消</td></tr></table>"""
+
+
+def test_parse_pair_odds():
+    from keiba.parse import parse_pair_odds
+    assert parse_pair_odds(PAIR_HTML, "umaren") == {"1-2": 167.9, "1-3": 4.4, "2-3": 1234.5}
+    assert parse_pair_odds(PAIR_HTML, "wide") == {"1-3": [2.3, 2.5]}

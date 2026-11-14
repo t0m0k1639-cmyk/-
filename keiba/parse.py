@@ -533,6 +533,36 @@ def parse_odds_table(html: str) -> dict[int, dict]:
     return out
 
 
+def parse_pair_odds(html: str, kind: str) -> dict[str, float | list[float]]:
+    """馬連（kind="umaren"）・ワイド（kind="wide"）のオッズのページから、
+    {"3-4": 4.4}（馬連）/ {"3-4": [2.3, 2.5]}（ワイドは下限・上限）を返す。馬番は小さい方が先。取消は除く。
+
+    table.umaren / table.wide が1頭目ごとにあり、caption が1頭目、各行の th が2頭目、td がオッズ（2026年11月に確認）。
+    """
+    out: dict[str, float | list[float]] = {}
+    num = lambda t: float(t.replace(",", ""))
+    for table in BeautifulSoup(html, "html.parser").select(f"table.{kind}"):
+        a = _digits(norm(table.caption.get_text())) if table.caption else None
+        if a is None:
+            continue
+        for tr in table.find_all("tr"):
+            th, td = tr.find("th"), tr.find("td")
+            b = _digits(norm(th.get_text())) if th else None
+            if b is None or td is None or a == b:
+                continue
+            key = f"{min(a, b)}-{max(a, b)}"
+            if kind == "wide":
+                lo, hi = td.find(class_="min"), td.find(class_="max")
+                vals = [norm(x.get_text()) for x in (lo, hi) if x]
+                if len(vals) == 2 and all(re.fullmatch(r"\d+(?:,\d{3})*\.\d", v) for v in vals):
+                    out[key] = [num(vals[0]), num(vals[1])]
+            else:
+                v = norm(td.get_text())
+                if re.fullmatch(r"\d+(?:,\d{3})*\.\d", v):
+                    out[key] = num(v)
+    return out
+
+
 GOINGS = ["不良", "稍重", "重", "良"]   # 「稍重」を「重」より先に
 
 

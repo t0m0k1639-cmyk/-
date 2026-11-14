@@ -76,7 +76,7 @@ def _build_race(f: Fetcher, venue: str, row: parse.DayRow) -> Race:
     race.win_odds = [h.odds for h in running if h.odds]
     if row.odds_link:
         try:
-            table = odds_table(f, row.odds_link)
+            table, odds_html = _odds_page(f, row.odds_link)
             for h in running:
                 o = table.get(h.number) or {}
                 h.odds = h.odds or o.get("win")
@@ -84,6 +84,12 @@ def _build_race(f: Fetcher, venue: str, row: parse.DayRow) -> Race:
             race.win_odds = race.win_odds or [h.odds for h in running if h.odds]
         except Exception as e:
             log.warning("%s%dR のオッズを読めませんでした: %s", venue, race.number, e)
+        else:
+            if table:   # 単勝が出ていない（発売前）なら馬連・ワイドも取りに行かない
+                try:
+                    race.umaren, race.wide = pair_odds(f, odds_html)
+                except Exception as e:
+                    log.warning("%s%dR の馬連・ワイドのオッズを読めませんでした: %s", venue, race.number, e)
     return race
 
 
@@ -118,13 +124,29 @@ def collect_some(f: Fetcher, today: date, top_d: str, wanted: set[tuple[str, int
 
 def odds_table(f: Fetcher, link: parse.Link) -> dict[int, dict]:
     """オッズのページから単勝・複勝（終わったレースは確定オッズ）。"""
+    return _odds_page(f, link)[0]
+
+
+def _odds_page(f: Fetcher, link: parse.Link) -> tuple[dict[int, dict], str]:
+    """(単勝・複勝, 単勝・複勝のページのHTML)。HTML には馬連・ワイドなどのページへのリンクがある。"""
     html = _open(f, link)
     odds = parse.parse_odds_table(html)
     if not odds:
         tan = next((l for l in parse.extract_links(html) if "単勝" in l.text), None)
         if tan:
-            odds = parse.parse_odds_table(_open(f, tan))
-    return odds
+            html = _open(f, tan)
+            odds = parse.parse_odds_table(html)
+    return odds, html
+
+
+def pair_odds(f: Fetcher, odds_html: str) -> tuple[dict, dict]:
+    """単勝・複勝のページのリンクから、馬連とワイドのオッズを読む（1レース2回のアクセス）。"""
+    links = parse.extract_links(odds_html)
+    out = []
+    for label, kind in (("馬連", "umaren"), ("ワイド", "wide")):
+        link = next((l for l in links if l.text.strip() == label), None)
+        out.append(parse.parse_pair_odds(_open(f, link), kind) if link else {})
+    return out[0], out[1]
 
 
 def collect_going(f: Fetcher) -> dict[str, dict[str, str]]:

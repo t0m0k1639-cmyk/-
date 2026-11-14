@@ -356,6 +356,35 @@ body.focus #races > li:not(.focused) { display: none; }
 .sim-note { margin: 0; font-size: 0.6875rem; color: var(--muted); }
 
 /* メモ */
+/* 合成オッズ */
+.calc { margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.calc summary { cursor: pointer; font-weight: 700; }
+.calc-body { display: grid; gap: 8px; margin-top: 8px; }
+.calc-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.calc-seg button, .calc-chips button {
+  font: inherit; font-size: var(--step--1); border: 1px solid var(--line); background: var(--surface);
+  color: var(--fg); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.calc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.calc-chips button { font-family: var(--font-num); min-width: 36px; padding: 5px 0; border-radius: 8px; }
+.calc-seg button[aria-pressed="true"], .calc-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 700; }
+.calc-row { display: grid; gap: 4px; }
+.calc-label { font-size: 0.6875rem; color: var(--muted); font-weight: 700; }
+.calc-budget input { font: inherit; font-family: var(--font-num); width: 120px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+.calc-sum { margin: 0; }
+.calc-sum strong { font-size: var(--step-1); font-family: var(--font-num); }
+.calc-sum.bad strong, .calc-note.bad { color: var(--err-fg); }
+.calc-note { margin: 0; font-size: var(--step--1); color: var(--muted); }
+.calc-table { width: 100%; border-collapse: collapse; font-size: var(--step--1); }
+.calc-table th, .calc-table td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+.calc-table .c-num { text-align: right; font-family: var(--font-num); white-space: nowrap; }
+.calc-table th { white-space: nowrap; font-size: 0.6875rem; color: var(--muted); }
+.calc-table .c-back { white-space: pre; }
+.calc-sum { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+.calc-table .c-nums { white-space: nowrap; font-family: var(--font-num); font-weight: 700; }
+.calc-table .c-name { display: block; font-size: 0.6875rem; color: var(--muted); overflow-wrap: anywhere; }
+.calc-table tr.gami td { background: var(--err-bg); color: var(--err-fg); }
+
 .memo { display: grid; gap: 4px; margin-bottom: 10px; font-size: var(--step--1); color: var(--muted); font-weight: 700; }
 .memo textarea {
   font: inherit; font-weight: 400; font-size: var(--step-0); color: var(--fg); background: var(--bg);

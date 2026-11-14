@@ -48,6 +48,9 @@ class Race:
     moist: list[float] | None = None  # その馬場の含水率 [ゴール前, 4コーナー]（%）
     baba_time: str | None = None    # 含水率・クッション値の測定時刻
     horses: list[Horse] = field(default_factory=list)
+    # 馬連・ワイドのオッズ {"3-4": 4.4} / {"3-4": [2.3, 2.5]}（ページの合成オッズの計算に使う）
+    umaren: dict[str, float] = field(default_factory=dict)
+    wide: dict[str, list[float]] = field(default_factory=dict)
     # 単勝オッズ。スコア計算に使う（各馬の odds があればそこから作る）
     win_odds: list[float] = field(default_factory=list, repr=False)
 

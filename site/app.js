@@ -621,6 +621,9 @@
     if (!horses.length || r.surface === "障害") simBtn.disabled = true;
     simBtn.addEventListener("click", () => renderSim(r, node.querySelector(".sim-out")));
 
+    const calc = node.querySelector(".calc");
+    calc.addEventListener("toggle", () => { if (calc.open) renderCalc(r, calc.querySelector(".calc-body")); });
+
     const memo = node.querySelector(".memo textarea");
     memo.id = `memo-${r.key}`;
     memo.value = yosoOf(r).memo || "";
@@ -682,6 +685,115 @@
     $("focus-prev").onclick = () => prev && openRace(prev.key, true);
     $("focus-next").onclick = () => next && openRace(next.key, true);
     if (focus.shown !== key) { focus.shown = key; window.scrollTo(0, 0); }
+  }
+
+  // ---- 合成オッズ：選んだ買い目のどれが当たっても同じくらい戻るように配分したときの倍率（1 ÷ Σ 1/オッズ）。
+  // 複勝・ワイドはオッズに幅があるので、下限で配分し、合成オッズも「下限〜上限」で出す
+  const calcState = {};
+  function renderCalc(r, box) {
+    const st = calcState[r.key] = calcState[r.key] || { kind: "win", how: "box", sel: [], axis: null, budget: 1000 };
+    const running = (r.horses || []).filter((h) => !h.scratched).sort((a, b) => a.number - b.number);
+    const nameOf = (n) => (running.find((h) => h.number === n) || {}).name || "";
+    const KINDS = [["win", "単勝"], ["place", "複勝"], ["umaren", "馬連"], ["wide", "ワイド"]];
+    const pair = st.kind === "umaren" || st.kind === "wide";
+    // [lo, hi] でそろえる（単勝・馬連は lo = hi）
+    const oddsOf = (nums) => {
+      if (st.kind === "win") { const h = running.find((x) => x.number === nums[0]); return h && h.odds ? [h.odds, h.odds] : null; }
+      if (st.kind === "place") { const h = running.find((x) => x.number === nums[0]); return h && h.place_odds ? h.place_odds : null; }
+      const v = (r[st.kind] || {})[`${Math.min(...nums)}-${Math.max(...nums)}`];
+      return v == null ? null : Array.isArray(v) ? v : [v, v];
+    };
+    const tickets = () => {
+      if (!pair) return st.sel.map((n) => [n]);
+      if (st.how === "box") return st.sel.flatMap((a, i) => st.sel.slice(i + 1).map((b) => [a, b]));
+      return st.axis == null ? [] : st.sel.filter((n) => n !== st.axis).map((n) => [st.axis, n]);
+    };
+    const seg = (items, cur, on) => {
+      const d = el("div", "calc-seg");
+      for (const [v, t] of items) {
+        const b = Object.assign(el("button", "", t), { type: "button" });
+        b.setAttribute("aria-pressed", String(v === cur));
+        b.addEventListener("click", () => { on(v); renderCalc(r, box); });
+        d.append(b);
+      }
+      return d;
+    };
+    const chips = (label, isOn, onTap) => {
+      const wrap = el("div", "calc-row");
+      wrap.append(el("span", "calc-label", label));
+      const d = el("div", "calc-chips");
+      for (const h of running) {
+        const b = Object.assign(el("button", "", String(h.number)), { type: "button", title: h.name });
+        b.setAttribute("aria-pressed", String(isOn(h.number)));
+        b.addEventListener("click", () => { onTap(h.number); renderCalc(r, box); });
+        d.append(b);
+      }
+      wrap.append(d);
+      return wrap;
+    };
+    const parts = [seg(KINDS, st.kind, (v) => { st.kind = v; })];
+    const hasOdds = st.kind === "win" ? running.some((h) => h.odds) : st.kind === "place" ? running.some((h) => h.place_odds)
+      : Object.keys(r[st.kind] || {}).length > 0;
+    if (!hasOdds) {
+      parts.push(el("p", "calc-note", `${KINDS.find(([k]) => k === st.kind)[1]}のオッズがまだありません。「このレースを最新にする」で取り直すと出ます。`));
+      box.replaceChildren(...parts);
+      return;
+    }
+    if (pair) parts.push(seg([["box", "ボックス"], ["nagashi", "流し（軸1頭）"]], st.how, (v) => { st.how = v; }));
+    const toggle = (n) => { st.sel = st.sel.includes(n) ? st.sel.filter((x) => x !== n) : [...st.sel, n].sort((a, b) => a - b); };
+    if (pair && st.how === "nagashi") {
+      parts.push(chips("軸", (n) => n === st.axis, (n) => { st.axis = st.axis === n ? null : n; st.sel = st.sel.filter((x) => x !== n); }));
+      parts.push(chips("相手", (n) => st.sel.includes(n) && n !== st.axis, (n) => { if (n !== st.axis) toggle(n); }));
+    } else {
+      parts.push(chips(pair ? "ボックスにする馬" : "買う馬", (n) => st.sel.includes(n), toggle));
+    }
+    const budgetRow = el("label", "calc-row calc-budget");
+    const inp = Object.assign(document.createElement("input"), { type: "number", min: 100, step: 100, inputMode: "numeric", value: st.budget });
+    inp.addEventListener("change", () => { st.budget = Math.max(100, Math.round((+inp.value || 0) / 100) * 100); renderCalc(r, box); });
+    budgetRow.append(el("span", "calc-label", "予算（円）"), inp);
+    parts.push(budgetRow);
+
+    const ts = tickets().map((t) => ({ t, o: oddsOf(t) }));
+    const ok = ts.filter((x) => x.o), missing = ts.length - ok.length;
+    if (!ok.length) {
+      parts.push(el("p", "calc-note", pair && st.how === "nagashi" ? "軸と相手を選んでください。" : "馬を選んでください。"));
+      box.replaceChildren(...parts);
+      return;
+    }
+    const inv = (k) => ok.reduce((a, x) => a + 1 / x.o[k], 0);
+    const synLo = 1 / inv(0), synHi = 1 / inv(1);
+    // 下限のオッズで、どれが当たっても同じくらい戻るように配分（100円単位・最低100円）
+    ok.forEach((x) => { x.yen = Math.max(100, Math.round(st.budget * (1 / x.o[0]) / inv(0) / 100) * 100); });
+    const total = ok.reduce((a, x) => a + x.yen, 0);
+    const fmt = (v) => v.toFixed(v >= 100 ? 0 : 1);
+    const rng = (lo, hi) => (lo === hi ? `${fmt(lo)}倍` : `${fmt(lo)}〜${fmt(hi)}倍`);
+    const sum = el("p", `calc-sum${synLo < 1 ? " bad" : ""}`);
+    sum.append(el("strong", "", `合成オッズ ${rng(synLo, synHi)}`), document.createTextNode(`${ok.length}点・合計${total.toLocaleString()}円`));
+    parts.push(sum);
+    if (synLo < 1) parts.push(el("p", "calc-note bad", "合成オッズが1倍を下回っています。どれが当たっても使ったお金より少なく戻ります（トリガミ）。"));
+    const table = el("table", "calc-table");
+    const thead = el("thead"), htr = el("tr");
+    ["買い目", "オッズ", "購入", "当たったら"].forEach((t) => htr.append(Object.assign(el("th", "", t), { scope: "col" })));
+    thead.append(htr);
+    const tbody = el("tbody");
+    for (const x of ok) {
+      const back = [x.yen * x.o[0], x.yen * x.o[1]].map((v) => Math.floor(v / 10) * 10);
+      const tr = el("tr", back[0] < total ? "gami" : "");
+      const bet = el("td", "c-bet");
+      bet.append(el("span", "c-nums", x.t.map(circled).join("-")));
+      if (x.t.length === 1) bet.append(el("span", "c-name", nameOf(x.t[0])));
+      tr.append(bet, el("td", "c-num", rng(x.o[0], x.o[1])), el("td", "c-num", `${x.yen.toLocaleString()}円`),
+        el("td", "c-num c-back", back[0] === back[1] ? `${back[0].toLocaleString()}円` : `${back[0].toLocaleString()}〜\n${back[1].toLocaleString()}円`));
+      tbody.append(tr);
+    }
+    table.append(thead, tbody);
+    parts.push(table);
+    const notes = [];
+    if (missing) notes.push(`オッズがない買い目が${missing}点あるので、計算から外しています。`);
+    if (ok.some((x) => x.yen * x.o[0] < total)) notes.push("色のついた行は、当たっても合計の購入額を下回ります（トリガミ）。");
+    notes.push(`オッズは${fmtTime(state.day.generated_at)}時点のものです（レースを最新にすると取り直します）。${st.kind === "place" || st.kind === "wide" ? "複勝・ワイドは下限のオッズで配分しています。" : ""}`);
+    parts.push(...notes.map((t) => el("p", "calc-note", t)));
+    box.replaceChildren(...parts);
   }
 
   function sorted(races) {
