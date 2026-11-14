@@ -36,6 +36,7 @@ function candidates(day, results) {
         key, month: key.slice(0, 7), year: key.slice(0, 4), venue: r.venue, surface: r.surface, n,
         cls: classOf(r.race_class || r.name || ""), ev: x.ev, lo: x.lo, p3: x.p3, rank: pops.indexOf(x.p3) + 1,
         hit: yenOf(pay.place, x.num) > 0, yen: yenOf(pay.place, x.num),   // 7頭以下は2着まで
+        pos: place[x.num],
       });
     }
   }
@@ -129,6 +130,20 @@ if (periods.length > 1) {
     console.log(`\n${first.label}で一番良かった条件（300頭以上）：期待値${best.e}以上・下限${best.l === 99 ? "制限なし" : `${best.l}倍まで`} | ${HEAD}`);
     for (const p of periods) console.log(line(p.label, p.c.filter(f)));
   }
+}
+
+// 着順の内訳：買い候補は1着が多いのか、2・3着も拾えているのか（オッズの順位が同じ馬全体と比べる）
+const posLine = (name, bets) => {
+  const n = bets.length;
+  if (!n) return `${name} | 0 | - | - | - | -`;
+  const r = (f) => pct(bets.filter(f).length / n);
+  return [name, n, r((c) => c.pos === 1), r((c) => c.pos === 2), r((c) => c.pos === 3), r((c) => !(c.pos <= 3))].join(" | ");
+};
+console.log("\n着順の内訳 | 頭数 | 1着 | 2着 | 3着 | 4着以下");
+for (const p of periods) console.log(posLine(`今の条件・${p.label}`, p.c.filter(now)));
+for (const r of [1, 2, 3]) {
+  console.log(posLine(`今の条件・オッズから見た複勝率${r}位`, all.filter((c) => now(c) && c.rank === r)));
+  console.log(posLine(`（比べる用）複勝率${r}位の馬すべて`, all.filter((c) => c.rank === r)));
 }
 
 // （参考）買い方の基準：期待値に関係なく、オッズから見た複勝率の順位ごとに全部買った場合
