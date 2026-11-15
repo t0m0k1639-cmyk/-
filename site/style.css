@@ -369,6 +369,8 @@ body.focus #races > li:not(.focused) { display: none; }
   color: var(--fg); border-radius: 999px; padding: 4px 12px; cursor: pointer;
 }
 .calc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.calc-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.calc-quick button { font: inherit; font-size: 0.75rem; border: 1px dashed var(--accent); background: transparent; color: var(--accent); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
 .calc-chips button { font-family: var(--font-num); min-width: 36px; padding: 5px 0; border-radius: 8px; }
 .calc-seg button[aria-pressed="true"], .calc-chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 700; }
 .calc-row { display: grid; gap: 4px; }

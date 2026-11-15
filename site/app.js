@@ -492,7 +492,16 @@
           el("p", "sim-trio-sub", "1列目は◎○、2列目は◎○▲☆、3列目は印の馬すべて（注まで）。◎か○のどちらかが3着以内に来れば当たる形で、流しより点数は増えます。"));
       }
       const check = rv ? resultCheck(rv, res.rows.map((x) => x.h.num)) : null;
-      out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, ...(trioLine ? [trioLine] : []), use, betBar(r, res), note);
+      simMarks[r.key] = res.rows.filter((x) => x.mark).map((x) => x.h.num);
+      const toCalc = Object.assign(el("button", "sim-use"), { type: "button", textContent: "この印で合成オッズを計算" });
+      toCalc.addEventListener("click", () => {
+        const card = out.closest(".race"), calc = card.querySelector(".calc");
+        pickForCalc(r, simMarks[r.key]);
+        calc.open = true;
+        renderCalc(r, calc.querySelector(".calc-body"));
+        calc.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
+      out.replaceChildren(head, ...warn, ...(check ? [check] : []), wrap, ...(trioLine ? [trioLine] : []), use, toCalc, betBar(r, res), note);
     }, 30);
   }
 
@@ -697,8 +706,17 @@
   // ---- 合成オッズ：選んだ買い目のどれが当たっても同じくらい戻るように配分したときの倍率（1 ÷ Σ 1/オッズ）。
   // 複勝・ワイドはオッズに幅があるので、下限で配分し、合成オッズも「下限〜上限」で出す
   const calcState = {};
+  const simMarks = {};   // レースごとの、最後にシミュレーションした印の馬（◎から順）
+  const calcOf = (r) => (calcState[r.key] = calcState[r.key] || { kind: "win", how: "box", sel: [], axis: null, budget: 1000 });
+  // 印の馬（◎から順）を選ぶ。流しなら先頭（◎）を軸、残りを相手にする
+  function pickForCalc(r, nums) {
+    const st = calcOf(r);
+    if (!nums.length) return;
+    if (st.how === "nagashi" && (st.kind === "umaren" || st.kind === "wide")) { st.axis = nums[0]; st.sel = nums.slice(1).sort((a, b) => a - b); }
+    else { st.sel = [...nums].sort((a, b) => a - b); }
+  }
   function renderCalc(r, box) {
-    const st = calcState[r.key] = calcState[r.key] || { kind: "win", how: "box", sel: [], axis: null, budget: 1000 };
+    const st = calcOf(r);
     const running = (r.horses || []).filter((h) => !h.scratched).sort((a, b) => a.number - b.number);
     const nameOf = (n) => (running.find((h) => h.number === n) || {}).name || "";
     const KINDS = [["win", "単勝"], ["place", "複勝"], ["umaren", "馬連"], ["wide", "ワイド"]];
@@ -754,6 +772,17 @@
     } else {
       parts.push(chips(pair ? "ボックスにする馬" : "買う馬", (n) => st.sel.includes(n), toggle));
     }
+    // 印の馬をまとめて選ぶ（自分の印は✕を除く。シミュの印は、そのレースでシミュレーションしたあとに出る）
+    const m = yosoOf(r).m;
+    const mine = MARK_CYCLE.slice(1, -1).flatMap((mk) => Object.keys(m).filter((n) => m[n] === mk).map(Number));
+    const quick = el("div", "calc-quick");
+    for (const [label, nums] of [["自分の印の馬", mine], ["シミュの印の馬", simMarks[r.key] || []], ["選び直す", null]]) {
+      if (nums && !nums.length) continue;
+      const b = Object.assign(el("button", "", label), { type: "button" });
+      b.addEventListener("click", () => { if (nums) pickForCalc(r, nums); else { st.sel = []; st.axis = null; } renderCalc(r, box); });
+      quick.append(b);
+    }
+    parts.push(quick);
     const budgetRow = el("label", "calc-row calc-budget");
     const inp = Object.assign(document.createElement("input"), { type: "number", min: 100, step: 100, inputMode: "numeric", value: st.budget });
     inp.addEventListener("change", () => { st.budget = Math.max(100, Math.round((+inp.value || 0) / 100) * 100); renderCalc(r, box); });
