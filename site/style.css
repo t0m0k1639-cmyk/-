@@ -523,3 +523,13 @@ main.wrap, #content { grid-template-columns: minmax(0, 1fr); }
 .batch-msg { font-size: var(--step--1); color: var(--muted); }
 .batch-msg:empty { display: none; }
 .rv-table tr.rv-plus th, .rv-table tr.rv-plus td { color: var(--hon); font-weight: 700; }
+
+/* 過去データの書き出し */
+.export-year { display: inline-flex; align-items: center; gap: 8px; font-size: var(--step--1); }
+.export-year select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+.export-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.export-btns button {
+  font: inherit; font-size: var(--step--1); border: 1px solid var(--accent); background: var(--surface);
+  color: var(--accent); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+.export-btns button:disabled { opacity: 0.5; cursor: default; }

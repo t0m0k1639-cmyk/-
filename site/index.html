@@ -97,6 +97,19 @@
     <p>スコアの計算では、オッズはレースを選ぶためだけに使っています。印を考えるときにオッズを見たくなければ「オッズ表示」を押して隠せます。</p>
   </details>
 
+  <details class="howto" id="export-box">
+    <summary>過去データの書き出し（CSV）</summary>
+    <p>過去のレース結果の控え（JRA公式サイトから集めたもの）を、この端末の中で復号して CSV ファイルにします。Excel でも開けます。自分で使うためのものなので、ほかの人には配らないでください。</p>
+    <label class="export-year"><span>期間</span><select id="export-year"></select></label>
+    <div class="export-btns">
+      <button type="button" data-kind="races">レースの表</button>
+      <button type="button" data-kind="runners">出走馬の表</button>
+      <button type="button" data-kind="payouts">払戻金の表</button>
+      <button type="button" data-kind="readme">列の説明</button>
+    </div>
+    <p id="export-msg" class="token-msg" aria-live="polite"></p>
+  </details>
+
   <details class="howto" id="token-box">
     <summary>更新ボタンの設定（GitHub の合鍵）</summary>
     <p>「このレースを最新にする」ボタンは、GitHub のアクセストークン（この処理を動かす権限だけの合鍵）を使って、取得処理を呼び出します。合鍵はこの端末の中にだけ保存されます。</p>

@@ -832,6 +832,91 @@
     box.replaceChildren(...parts);
   }
 
+  // ---- 過去データの書き出し：data/backtest/races.json（ページと同じパスワードで暗号化）を復号して CSV にする
+  let backtestData = null;
+  async function loadBacktest() {
+    if (!backtestData) backtestData = await decrypt(await getJSON("data/backtest/races.json"), state.password);
+    return backtestData;
+  }
+  const PAY_NAMES = { win: "単勝", place: "複勝", wakuren: "枠連", wide: "ワイド", umaren: "馬連", umatan: "馬単", trio: "3連複", tierce: "3連単" };
+  const EXPORT_COLS = {
+    races: ["レースID", "日付", "競馬場", "レース番号", "レース名", "クラス", "芝ダート", "距離", "馬場", "出走頭数"],
+    runners: ["レースID", "日付", "競馬場", "レース番号", "着順", "着順のない理由", "枠番", "馬番", "馬ID", "馬名", "性齢", "斤量",
+      "騎手", "タイム", "通過順", "上がり3F", "馬体重", "馬体重の増減", "人気", "単勝オッズ", "複勝オッズ下限", "複勝オッズ上限"],
+    payouts: ["レースID", "日付", "競馬場", "レース番号", "券種", "組番", "払戻金（100円あたり）"],
+  };
+  const EXPORT_README = [
+    "過去のレース結果（JRA公式サイトの「過去のレース結果」から集めたもの）",
+    "",
+    "ファイル：keiba_races_期間.csv（レースの表）、keiba_runners_期間.csv（出走馬の表）、keiba_payouts_期間.csv（払戻金の表）。期間は all（すべて）か年。",
+    "",
+    "3つの表は「レースID」（例 2026-10-25|東京-11）でつながります。",
+    "",
+    "レースの表：1レース1行。距離はメートル。馬場は 良・稍重・重・不良。",
+    "出走馬の表：1頭1行。着順が空の馬は「着順のない理由」（取消・除外・中止など）を見てください。",
+    "  通過順は各コーナーの順位を - でつないだもの。上がり3F は秒。馬体重は kg。人気・オッズは締め切り時点（確定）。",
+    "  馬ID は JRA の馬ごとの番号で、同じ馬の別のレースを探すのに使えます。",
+    "  単勝・複勝オッズは 2023年10月以降のレースだけ（それより前は空）。",
+    "払戻金の表：当たった組番ごとに1行。払戻金は100円あたりの金額（円）。同着のときは同じ券種が複数行になります。",
+  ].join("\n");
+  function toCsv(header, rows) {
+    const cell = (v) => { const t = v == null ? "" : String(v); return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    return "\ufeff" + [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");   // 先頭の BOM は Excel で文字化けしないため
+  }
+  function saveFile(name, text, type) {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
+  function exportRows(kind, races) {
+    const head = (key, r) => [key, r.date, r.venue, r.number];
+    if (kind === "races") {
+      return races.map(([key, r]) => [...head(key, r), r.name, r.race_class, r.surface, r.distance, r.going,
+        (r.runners || []).filter((x) => x.place != null || ["中止", "失格"].includes(x.status)).length]);
+    }
+    if (kind === "runners") {
+      return races.flatMap(([key, r]) => (r.runners || []).map((x) => {
+        const o = (r.odds || {})[String(x.number)] || {};
+        const pl = o.place || [];
+        return [...head(key, r), x.place, x.status, x.waku, x.number, x.horse_id, x.name, x.sex_age, x.kin, x.jockey, x.time,
+          (x.corners || []).join("-"), x.last3f, x.body_weight, x.body_weight_diff, x.popularity, o.win, pl[0], pl[1]];
+      }));
+    }
+    return races.flatMap(([key, r]) => Object.entries(r.payouts || {}).flatMap(([k, list]) =>
+      list.map((p) => [...head(key, r), PAY_NAMES[k] || k, p.nums.join("-"), p.yen])));
+  }
+  function setupExport() {
+    const sel = $("export-year");
+    const thisYear = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+    sel.replaceChildren(...[["all", "すべて"], ...Array.from({ length: thisYear - 2022 }, (_, k) => [String(thisYear - k), `${thisYear - k}年`])]
+      .map(([v, t]) => Object.assign(document.createElement("option"), { value: v, textContent: t })));
+    const msg = $("export-msg");
+    document.querySelectorAll("#export-box .export-btns button").forEach((b) => b.addEventListener("click", async () => {
+      const kind = b.dataset.kind;
+      // ファイル名は英数字にする（日本語の名前を付けられないブラウザがある）
+      if (kind === "readme") { saveFile("keiba_readme.txt", "\ufeff" + EXPORT_README, "text/plain"); return; }
+      b.disabled = true;
+      msg.textContent = "読み込んで復号しています…（初回は少し時間がかかります）";
+      try {
+        const data = await loadBacktest();
+        const year = sel.value;
+        const races = Object.entries(data.races || {}).filter(([, r]) => year === "all" || (r.date || "").startsWith(year))
+          .sort(([a], [b2]) => (a < b2 ? -1 : 1));
+        if (!races.length) { msg.textContent = "この期間のデータはありません"; return; }
+        const rows = exportRows(kind, races);
+        const label = { races: "レース", runners: "出走馬", payouts: "払戻金" }[kind];
+        saveFile(`keiba_${kind}_${year}.csv`, toCsv(EXPORT_COLS[kind], rows), "text/csv");
+        const dates = races.map(([, r]) => r.date);
+        msg.textContent = `${label}の表（keiba_${kind}_${year}.csv）を書き出しました：${races.length.toLocaleString()}レース・${rows.length.toLocaleString()}行、${dates[0]}〜${dates[dates.length - 1]}`;
+      } catch (e) {
+        msg.textContent = e instanceof WrongPassword ? "このページのパスワードでは過去データを開けませんでした" : `書き出せませんでした：${e.message}`;
+      } finally {
+        b.disabled = false;
+      }
+    }));
+  }
+
   function sorted(races) {
     const list = races.filter((r) => state.venue === "すべて" || r.venue === state.venue);
     const byNum = (a, b) => a.venue.localeCompare(b.venue, "ja") || a.number - b.number;
@@ -1063,6 +1148,7 @@
   async function init() {
     window.addEventListener("hashchange", applyFocus);
     $("focus-back").addEventListener("click", closeRace);
+    setupExport();
     // 狙い目・買い候補のリンク（#r-東京-10）も、1レースの画面で開く
     document.addEventListener("click", (e) => {
       const a = e.target.closest('a[href^="#r-"]');
